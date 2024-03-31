@@ -105,10 +105,10 @@ Non-trainable params: 1376 (5.38 KB) <br>
 ### 3. **Remove Early Stopping**:
 
 #### Training & Validation Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/4d0b4f99-e611-41c1-a3c2-da8feb62d0f6' width='600'>
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/b21ae649-b292-4707-aa04-a7a533d243ea' width='600'>
 
 #### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/32aae3f5-dd91-4b19-a82f-6ad0d87c8c77' width='600'>
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/57e8828d-ceac-4cda-8fd5-eab42558ca40' width='600'>
 
 #### Results
 Test loss: 0.5847798585891724 / Test accuracy: 0.8770999908447266
