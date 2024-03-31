@@ -3,7 +3,7 @@
 ## Progress
 
 1. **Implement ResNet20**
-   - The architecture:
+   - Foundation Architecture:
   
 
 | Layer (type)               | Output Shape         | Param       |
@@ -92,3 +92,38 @@ Trainable params: 270410 (1.03 MB) <br>
 Non-trainable params: 1376 (5.38 KB) <br>
 
 2. **Add Dropout layer after residual block and implement Early Stopping**: result isn't great
+   - Drop out layer is added after Flatten with drop out rate 0.5
+   - It consists of a Dense, a BatchNorm, an Activation, and a Dropout
+   - Early stopping is added to the callback, hence it stops at epoch 60 something hindering further progress
+
+### Training & Validation Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/c01e9bc7-b5c7-4ee3-89ed-ebf31838c66b' width='600'>
+
+### Training & Validation Loss
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/f89ace7b-58f8-4044-9de1-5867d508a62b' width='600'>
+
+3. **Remove Early Stopping**:
+
+### Training & Validation Accuracy
+# TODO
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/c01e9bc7-b5c7-4ee3-89ed-ebf31838c66b' width='600'>
+
+# TODO
+### Training & Validation Loss
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/f89ace7b-58f8-4044-9de1-5867d508a62b' width='600'>
+
+
+### Results
+Test loss: 0.5847798585891724 / Test accuracy: 0.8770999908447266
+
+3. **Remove final layer that was added previously**
+   - Drop out rate remains 0.5
+   - Now it's Flatten $\rightarrow$ Dropout $\rightarrow$ Output
+  
+Total params: 272170 (1.04 MB)
+Trainable params: 270602 (1.03 MB)
+Non-trainable params: 1568 (6.12 KB)
+
+
+
+
