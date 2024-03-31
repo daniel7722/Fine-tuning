@@ -2,7 +2,7 @@
 
 ## Progress
 
-1. **Implement ResNet20**
+### 1. **Implement ResNet20**
    - Foundation Architecture:
   
 
@@ -81,48 +81,45 @@
 | flatten                    | (None, 64)           | 0           |
 | dense                      | (None, 10)           | 650         |
 
-### Training & Validation Accuracy
+#### Training & Validation Accuracy
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/3922508b-5419-45d6-a38d-fa2ec769677b' width='600'>
 
-### Training & Validation Loss
+#### Training & Validation Loss
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/7276a14f-e136-4403-ae54-2e187edc376b' width='600'>
 
 Total params: 271786 (1.04 MB) <br>
 Trainable params: 270410 (1.03 MB) <br>
 Non-trainable params: 1376 (5.38 KB) <br>
 
-2. **Add Dropout layer after residual block and implement Early Stopping**: result isn't great
+### 2. **Add Dropout layer after residual block and implement Early Stopping**: result isn't great
    - Drop out layer is added after Flatten with drop out rate 0.5
    - It consists of a Dense, a BatchNorm, an Activation, and a Dropout
    - Early stopping is added to the callback, hence it stops at epoch 60 something hindering further progress
 
-### Training & Validation Accuracy
+#### Training & Validation Accuracy
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/c01e9bc7-b5c7-4ee3-89ed-ebf31838c66b' width='600'>
 
-### Training & Validation Loss
+#### Training & Validation Loss
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/f89ace7b-58f8-4044-9de1-5867d508a62b' width='600'>
 
-3. **Remove Early Stopping**:
+### 3. **Remove Early Stopping**:
 
-### Training & Validation Accuracy
-# TODO
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/c01e9bc7-b5c7-4ee3-89ed-ebf31838c66b' width='600'>
+#### Training & Validation Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/4d0b4f99-e611-41c1-a3c2-da8feb62d0f6' width='600'>
 
-# TODO
-### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/f89ace7b-58f8-4044-9de1-5867d508a62b' width='600'>
+#### Training & Validation Loss
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/32aae3f5-dd91-4b19-a82f-6ad0d87c8c77' width='600'>
 
-
-### Results
+#### Results
 Test loss: 0.5847798585891724 / Test accuracy: 0.8770999908447266
 
-3. **Remove final layer that was added previously**
+### 4. **Remove final layer that was added previously**
    - Drop out rate remains 0.5
    - Now it's Flatten $\rightarrow$ Dropout $\rightarrow$ Output
   
-Total params: 272170 (1.04 MB)
-Trainable params: 270602 (1.03 MB)
-Non-trainable params: 1568 (6.12 KB)
+Total params: 272170 (1.04 MB)<br>
+Trainable params: 270602 (1.03 MB)<br>
+Non-trainable params: 1568 (6.12 KB)<br>
 
 
 
