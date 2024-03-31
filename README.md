@@ -81,6 +81,12 @@
 | flatten                    | (None, 64)           | 0           |
 | dense                      | (None, 10)           | 650         |
 
+### Training & Validation Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/3922508b-5419-45d6-a38d-fa2ec769677b' width='600'>
+
+### Training & Validation Loss
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/7276a14f-e136-4403-ae54-2e187edc376b' width='600'>
+
 Total params: 271786 (1.04 MB) <br>
 Trainable params: 270410 (1.03 MB) <br>
 Non-trainable params: 1376 (5.38 KB) <br>
