@@ -91,6 +91,9 @@ Total params: 271786 (1.04 MB) <br>
 Trainable params: 270410 (1.03 MB) <br>
 Non-trainable params: 1376 (5.38 KB) <br>
 
+#### Results
+Test loss: 0.576532244682312 / Test accuracy: 0.8963000178337097
+
 ### 2. **Add Dropout layer after residual block and implement Early Stopping**: result isn't great
    - Drop out layer is added after Flatten with drop out rate 0.5
    - It consists of a Dense, a BatchNorm, an Activation, and a Dropout
