@@ -150,10 +150,15 @@ values = [0.1, 0.01, 0.001]<br>
 
 ### 5. **Adjust learning rate scheduler**
    - In view of the validation loss' pattern observed in previous graph, I adjust learning rate scheduling so it is smoother
-   - 
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/4ce941ed-ea5b-46e1-8aab-82ea6965e6d1' width='600'>
+
 config: 
 - learning rate: 
 boundaries = [20000, 32000, 56000]<br>
 values = [0.1, 0.02, 0.005, 0.001]<br>
 - Drop out rate: 0.5
+
+#### Results
+Test loss: 0.6009443402290344 / Test accuracy: 0.8934999704360962
 
