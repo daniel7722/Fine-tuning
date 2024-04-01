@@ -81,11 +81,9 @@
 | flatten                    | (None, 64)           | 0           |
 | dense                      | (None, 10)           | 650         |
 
-#### Training & Validation Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/3922508b-5419-45d6-a38d-fa2ec769677b' width='600'>
 
-#### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/7276a14f-e136-4403-ae54-2e187edc376b' width='600'>
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/2a25e066-9ac6-4e1a-8f52-364739a43170' width='600'>
 
 Total params: 271786 (1.04 MB) <br>
 Trainable params: 270410 (1.03 MB) <br>
@@ -99,19 +97,13 @@ Test loss: 0.576532244682312 / Test accuracy: 0.8963000178337097
    - It consists of a Dense, a BatchNorm, an Activation, and a Dropout
    - Early stopping is added to the callback, hence it stops at epoch 60 something hindering further progress
 
-#### Training & Validation Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/c01e9bc7-b5c7-4ee3-89ed-ebf31838c66b' width='600'>
-
-#### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/f89ace7b-58f8-4044-9de1-5867d508a62b' width='600'>
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/beddb697-d5a8-4c41-8b41-1d2220aef47f' width='600'>
 
 ### 3. **Remove Early Stopping**:
 
-#### Training & Validation Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/b21ae649-b292-4707-aa04-a7a533d243ea' width='600'>
-
-#### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/57e8828d-ceac-4cda-8fd5-eab42558ca40' width='600'>
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/d1c390c8-5d04-41e6-be13-a6a323061798' width='600'>
 
 #### Results
 Test loss: 0.5847798585891724 / Test accuracy: 0.8770999908447266
@@ -124,11 +116,8 @@ Total params: 272170 (1.04 MB)<br>
 Trainable params: 270602 (1.03 MB)<br>
 Non-trainable params: 1568 (6.12 KB)<br>
 
-#### Training & Validation Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/2c7b1f38-5cd8-42f2-ab35-68f4746bf982' width='600'>
-
-#### Training & Validation Loss
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/b7300b95-cb7a-433e-96ab-20b5dc999a44' width='600'>
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/64682f7e-2383-4fcd-a96e-1d5c6059a971' width='600'>
 
 #### Results
 Test loss: 0.5499668717384338 / Test accuracy: 0.8998000025749207
