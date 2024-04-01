@@ -121,6 +121,15 @@ Total params: 272170 (1.04 MB)<br>
 Trainable params: 270602 (1.03 MB)<br>
 Non-trainable params: 1568 (6.12 KB)<br>
 
+#### Training & Validation Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/2c7b1f38-5cd8-42f2-ab35-68f4746bf982' width='600'>
+
+#### Training & Validation Loss
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/b7300b95-cb7a-433e-96ab-20b5dc999a44' width='600'>
+
+#### Results
+Test loss: 0.5499668717384338 / Test accuracy: 0.8998000025749207
+
 
 
 
