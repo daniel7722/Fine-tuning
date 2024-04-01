@@ -158,7 +158,7 @@ config:
 - learning rate: 
 boundaries = [20000, 32000, 56000]<br>
 values = [0.1, 0.02, 0.005, 0.001]<br>
-- Drop out rate: 0.5
+- Drop out rate: 0.2
 
 #### Results
 Test loss: 0.6009443402290344 / Test accuracy: 0.8934999704360962
@@ -168,13 +168,19 @@ Test loss: 0.6009443402290344 / Test accuracy: 0.8934999704360962
    - Learning rate schedule is adjusted accordingly
 
 #### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/a3019a68-2db3-4b96-be71-4c67e426ca57' width='600'>
 
 config: 
 - learning rate: <br>
 boundaries = [5000, 10000, 20000]<br>
 values = [0.1, 0.02, 0.05, 0.001]<br>
-- Dropout rate: 0.5<br>
+- Dropout rate: 0.2<br>
 - Number of iteration: 320000
+
+### Results
+Test loss: 0.40080875158309937 / Test accuracy: 0.8847000002861023
+
+
 
 
 
