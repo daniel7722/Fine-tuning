@@ -150,6 +150,7 @@ values = [0.1, 0.01, 0.001]<br>
 
 ### 5. **Adjust learning rate scheduler**
    - In view of the validation loss' pattern observed in previous graph, I adjust learning rate scheduling so it is smoother
+
 #### Training & Validation Loss and Accuracy
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/4ce941ed-ea5b-46e1-8aab-82ea6965e6d1' width='600'>
 
@@ -161,4 +162,19 @@ values = [0.1, 0.02, 0.005, 0.001]<br>
 
 #### Results
 Test loss: 0.6009443402290344 / Test accuracy: 0.8934999704360962
+
+### 6. **Adjust learning rate again and half the number of epoch**
+   - Number of epoch is halved by setting number of iteration to 320000
+   - Learning rate schedule is adjusted accordingly
+
+#### Training & Validation Loss and Accuracy
+
+config: 
+- learning rate: <br>
+boundaries = [5000, 10000, 20000]<br>
+values = [0.1, 0.02, 0.05, 0.001]<br>
+- Dropout rate: 0.5<br>
+- Number of iteration: 320000
+
+
 
