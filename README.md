@@ -89,6 +89,11 @@ Total params: 271786 (1.04 MB) <br>
 Trainable params: 270410 (1.03 MB) <br>
 Non-trainable params: 1376 (5.38 KB) <br>
 
+config: 
+- learning rate: <br>
+boundaries = [32000, 48000]<br>
+values = [0.1, 0.01, 0.001]<br>
+
 #### Results
 Test loss: 0.576532244682312 / Test accuracy: 0.8963000178337097
 
@@ -100,10 +105,25 @@ Test loss: 0.576532244682312 / Test accuracy: 0.8963000178337097
 #### Training & Validation Loss and Accuracy
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/beddb697-d5a8-4c41-8b41-1d2220aef47f' width='600'>
 
+config: 
+- learning rate: <br>
+boundaries = [32000, 48000]<br>
+values = [0.1, 0.01, 0.001]<br>
+- Dropout rate: 0.5
+- Early Stopping
+- One more block
+
 ### 3. **Remove Early Stopping**:
 
 #### Training & Validation Loss and Accuracy
 <img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/d1c390c8-5d04-41e6-be13-a6a323061798' width='600'>
+
+config: 
+- learning rate: <br>
+boundaries = [32000, 48000]<br>
+values = [0.1, 0.01, 0.001]<br>
+- Dropout rate: 0.5
+- One more block
 
 #### Results
 Test loss: 0.5847798585891724 / Test accuracy: 0.8770999908447266
@@ -122,6 +142,18 @@ Non-trainable params: 1568 (6.12 KB)<br>
 #### Results
 Test loss: 0.5499668717384338 / Test accuracy: 0.8998000025749207
 
+config: 
+- learning rate: <br>
+boundaries = [32000, 48000]<br>
+values = [0.1, 0.01, 0.001]<br>
+- Dropout rate: 0.5
 
-
+### 5. **Adjust learning rate scheduler**
+   - In view of the validation loss' pattern observed in previous graph, I adjust learning rate scheduling so it is smoother
+   - 
+config: 
+- learning rate: 
+boundaries = [20000, 32000, 56000]<br>
+values = [0.1, 0.02, 0.005, 0.001]<br>
+- Drop out rate: 0.5
 
