@@ -173,9 +173,10 @@ Test loss: 0.6009443402290344 / Test accuracy: 0.8934999704360962
 config: 
 - learning rate: <br>
 boundaries = [5000, 10000, 20000]<br>
-values = [0.1, 0.02, 0.05, 0.001]<br>
+values = [0.1, 0.02, 0.05, 0.001] (I accidentally forgot a zero so the learning rate increased here)<br>
 - Dropout rate: 0.2<br>
 - Number of iteration: 320000
+- n = 2
 
 ### Results
 Test loss: 0.40080875158309937 / Test accuracy: 0.8847000002861023
