@@ -181,6 +181,27 @@ values = [0.1, 0.02, 0.05, 0.001] (I accidentally forgot a zero so the learning 
 ### Results
 Test loss: 0.40080875158309937 / Test accuracy: 0.8847000002861023
 
+### 7. **Adjust learning rate more aggressively with half the number of epoch**
+   - Number of epoch is halved by setting number of iteration to 320000
+   - Learning rate schedule is adjusted accordingly
+
+#### Training & Validation Loss and Accuracy
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/a3019a68-2db3-4b96-be71-4c67e426ca57' width='600'>
+
+config: 
+- learning rate: <br>
+boundaries = [2500, 7500, 15000, 20000]<br>
+values = [0.1, 0.02, 0.005, 0.002, 0.001]<br>
+- Dropout rate: 0.2<br>
+- Number of iteration: 320000
+- n = 2
+
+### Results
+Test loss: 0.44461724162101746 / Test accuracy: 0.8611000180244446
+
+## Some insights
+Initially, it was observed that the training accuracy and loss is very different from validation accuracy and loss, implying some degrees of overfitting. To prevent this, I added a dropout layer and do some variations with it, resulting not much differnt from what I initially have. In addition, a sudden improvement during training is captured due to the decrease in learning rate. Hence, I implement a smoother and more fine-grain learning rate scheduler with fewer number of epoch and n = 2 (generally to speed up, and avoid overfitting). This change does reflect on the results, making the training and validation set more closely in numerical value. However, achieving lower loss sacrifices the accuracy. The seach is not yet ended, few possible ways are currently brewing in my head. First, increase the number of epoch again in order to identify the decrease in overfitting is due to lower number of epoch or less complicated structure or fine-grained learning rate. Secondly, more hyperparameters can be explored to find a better combination of them such as batch size, weight decay, drop out rate, regularisation in residual block, etc. I will start my main project objective soon, which is explore some possible fine-tuning methods. Transfer learning is a big part, determining which layer to retrain is also a part of the research. Feature extraction could be the way to go. More literatures will be reviewed along the way, so stay tuned. Thanks:)
+
 
 
 
