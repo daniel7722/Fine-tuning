@@ -186,7 +186,7 @@ Test loss: 0.40080875158309937 / Test accuracy: 0.8847000002861023
    - Learning rate schedule is adjusted accordingly
 
 #### Training & Validation Loss and Accuracy
-<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/a3019a68-2db3-4b96-be71-4c67e426ca57' width='600'>
+<img src='https://github.com/daniel7722/Fine-tuning/assets/74921405/9c284260-51ca-4b1e-9b62-46aa7c1dcd7f' width='600'>
 
 config: 
 - learning rate: <br>
