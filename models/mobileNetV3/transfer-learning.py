@@ -8,7 +8,7 @@ import tensorflow_datasets as tfds
 This file demonstrates the use of transfer learning with MobileNetV3Small
 model on the Cats vs Dogs dataset.
 
-This script achieve 0.9868 accuracy and 0.9748 validation accuracy with 0.0720 loss with only 5 epochs.
+This script achieve 0.9868 accuracy and 0.9785 validation accuracy with 0.0610 loss with 5 epochs.
 """
 
 # Load MobileNetV3 without top
