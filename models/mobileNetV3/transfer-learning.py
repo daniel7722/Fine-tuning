@@ -58,3 +58,16 @@ history = model.fit(
     validation_data=val_ds,
     epochs=5
 )
+
+# Save the Keras model
+model.save("mobilenetv3_cats_vs_dogs.h5")
+
+# Convert to TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+tflite_model = converter.convert()
+
+# Save the TFLite model
+with open('mobilenetv3_cats_vs_dogs.tflite', 'wb') as f:
+    f.write(tflite_model)
+
+print("✅ TFLite model generated!")
