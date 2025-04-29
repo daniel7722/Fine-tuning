@@ -9,12 +9,9 @@ This file demonstrates the use of transfer learning with MobileNetV3Small
 model on the Cats vs Dogs dataset.
 
 This script achieve 0.9868 accuracy and 0.9748 validation accuracy with 0.0720 loss with only 5 epochs.
-
-
- 
 """
 
-# 1. Load MobileNetV3 without top
+# Load MobileNetV3 without top
 base_model = MobileNetV3Small(
     input_shape=(224, 224, 3),
     include_top=False,
@@ -22,7 +19,7 @@ base_model = MobileNetV3Small(
 )
 base_model.trainable = False  # Freeze base
 
-# 2. Add new classification head
+# Add new classification head
 model = models.Sequential([
     base_model,
     layers.GlobalAveragePooling2D(),
@@ -30,14 +27,14 @@ model = models.Sequential([
     layers.Dense(1, activation='sigmoid')  # Binary classification
 ])
 
-# 3. Compile model
+# Compile model
 model.compile(
     optimizer=tf.keras.optimizers.Adam(),
     loss='binary_crossentropy',
     metrics=['accuracy']
 )
 
-# 4. Load Cats vs Dogs dataset
+# Load Cats vs Dogs dataset
 (ds_train, ds_val), ds_info = tfds.load(
     'cats_vs_dogs',
     split=['train[:80%]', 'train[80%:]'],
