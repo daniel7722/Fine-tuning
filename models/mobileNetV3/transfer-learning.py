@@ -13,7 +13,7 @@ This script achieve 0.9868 accuracy and 0.9785 validation accuracy with 0.0610 l
 
 # Load MobileNetV3 without top
 base_model = MobileNetV3Small(
-    input_shape=(224, 224, 3),
+    input_shape=(324, 324, 3),
     include_top=False,
     weights='imagenet'
 )
@@ -24,13 +24,13 @@ model = models.Sequential([
     base_model,
     layers.GlobalAveragePooling2D(),
     layers.Dense(128, activation='relu'),
-    layers.Dense(1, activation='sigmoid')  # Binary classification
+    layers.Dense(2, activation='softmax') 
 ])
 
 # Compile model
 model.compile(
     optimizer=tf.keras.optimizers.Adam(),
-    loss='binary_crossentropy',
+    loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
@@ -44,7 +44,7 @@ model.compile(
 
 # Preprocessing function
 def preprocess(image, label):
-    image = tf.image.resize(image, (224, 224))
+    image = tf.image.resize(image, (324, 324))
     image = tf.cast(image, tf.float32)
     image = tf.keras.applications.mobilenet_v3.preprocess_input(image)
     return image, label
@@ -62,12 +62,24 @@ history = model.fit(
 # Save the Keras model
 model.save("mobilenetv3_cats_vs_dogs.h5")
 
-# Convert to TFLite
+# Convert to TFLite model with quantization
+def representative_data_gen(): 
+    for image, _ in ds_train.take(100):
+        image = tf.image.resize(image, (324, 324))
+        image = tf.cast(image, tf.float32)
+        image = tf.keras.applications.mobilenet_v3.preprocess_input(image)
+        yield [tf.expand_dims(image, axis=0)]
+
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
-tflite_model = converter.convert()
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.representative_dataset = representative_data_gen
+converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+converter.inference_input_type = tf.uint8
+converter.inference_output_type = tf.uint8
+tflite_quant_model = converter.convert()
 
 # Save the TFLite model
-with open('mobilenetv3_cats_vs_dogs.tflite', 'wb') as f:
-    f.write(tflite_model)
+with open('mobilenetv3_cats_vs_dogs_quant.tflite', 'wb') as f:
+    f.write(tflite_quant_model)
 
 print("✅ TFLite model generated!")

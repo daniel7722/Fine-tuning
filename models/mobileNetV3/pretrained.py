@@ -11,7 +11,7 @@ on the Imagenette dataset.
 
 # Load MobileNetV3Small with ImageNet pretrained weights
 model = MobileNetV3Small(
-    input_shape=(224, 224, 3),
+    input_shape=(324, 324, 3),
     weights='imagenet',
     include_top=True  # 1000-class classifier head
 )
@@ -31,7 +31,7 @@ raw_ds, ds_info = tfds.load(
 
 # Preprocessing function (but also return original for plotting)
 def preprocess_image(image, label):
-    original_image = tf.image.resize(image, (224, 224))
+    original_image = tf.image.resize(image, (324, 324))
     preprocessed_image = tf.cast(original_image, tf.float32)
     preprocessed_image = preprocess_input(preprocessed_image)
     return preprocessed_image, label, original_image
