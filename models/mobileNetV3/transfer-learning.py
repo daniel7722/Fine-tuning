@@ -1,18 +1,18 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
-from tensorflow.keras.applications import MobileNetV3Small
+from tensorflow.keras.applications import MobileNetV2
 import tensorflow_datasets as tfds
 
 
 """
-This file demonstrates the use of transfer learning with MobileNetV3Small
+This file demonstrates the use of transfer learning with MobileNetV2
 model on the Cats vs Dogs dataset.
 
 This script achieve 0.9868 accuracy and 0.9785 validation accuracy with 0.0610 loss with 5 epochs.
 """
 
 # Load MobileNetV3 without top
-base_model = MobileNetV3Small(
+base_model = MobileNetV2(
     input_shape=(324, 324, 3),
     include_top=False,
     weights='imagenet'
@@ -46,7 +46,7 @@ model.compile(
 def preprocess(image, label):
     image = tf.image.resize(image, (324, 324))
     image = tf.cast(image, tf.float32)
-    image = tf.keras.applications.mobilenet_v3.preprocess_input(image)
+    image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
     return image, label
 
 train_ds = ds_train.map(preprocess).shuffle(1000).batch(32).prefetch(tf.data.AUTOTUNE)
@@ -67,7 +67,7 @@ def representative_data_gen():
     for image, _ in ds_train.take(100):
         image = tf.image.resize(image, (324, 324))
         image = tf.cast(image, tf.float32)
-        image = tf.keras.applications.mobilenet_v3.preprocess_input(image)
+        image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
         yield [tf.expand_dims(image, axis=0)]
 
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
