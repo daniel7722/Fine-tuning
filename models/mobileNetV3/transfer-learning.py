@@ -9,29 +9,33 @@ from PIL import Image
 
 
 """
-This file demonstrates the use of transfer learning with MobileNetV2
-model on the Cats vs Dogs dataset.
+This script demonstrates transfer learning with MobileNetV2 model on the Cats vs Dogs dataset, 
+including preprocessing, model training, and post-traning quantisation for deployment on edge
+devices such as the Coral Edge TPU. 
+""" 
 
-This script achieve 0.9868 accuracy and 0.9785 validation accuracy with 0.0610 loss with 5 epochs.
-"""
 
-# Load MobileNetV3 without top
+# MobileNetV2 is loaded without its classification head, and its weight are frozen to leverage
+# pretrained feature from ImageNet, allowing transfer learning on a new dataset. 
 base_model = MobileNetV2(
-    input_shape=(324, 324, 3),
+    input_shape=(324, 324, 3), # Customised input shape to match EdgeTPU camera spec
     include_top=False,
-    weights='imagenet'
+    weights='imagenet'         # Load pretrained weights from ImageNet
 )
 base_model.trainable = False  # Freeze base
 
-# Add new classification head
+
+# The classification head consists of a global acverage pooling layer (to reduce spatial dimensions), 
+# a dense intermediate layer (for learning new representations), and a final dense layer with softmax 
+# activation for binary classification.
 model = models.Sequential([
     base_model,
     layers.GlobalAveragePooling2D(),
-    layers.Dense(128, activation='relu'),
-    layers.Dense(3, activation='softmax') 
+    layers.Dense(128, activation='relu'),  # Intermediate dense layer to learn new representations
+    layers.Dense(2, activation='softmax')  # Output layer for 2-class classification (cats vs dogs)
 ])
 
-# Compile model
+
 model.compile(
     optimizer=tf.keras.optimizers.Adam(),
     loss='sparse_categorical_crossentropy',
@@ -39,7 +43,9 @@ model.compile(
 )
 
 
-# Load Cats vs Dogs dataset
+
+# The dataset is split into training and validation sets (80/20), and images are resized and normalised 
+# to match the EdgeTPU camera spec.
 (ds_train, ds_val), ds_info = tfds.load(
     'cats_vs_dogs',
     split=['train[:80%]', 'train[80%:]'],
@@ -47,55 +53,39 @@ model.compile(
     with_info=True
 )
 
-# Preprocessing function
+# Define image preprocessing for both training and validation: 
+#  - Resize image to 324x324 to mathch customised input shape
+#  - Cast to float32 for model compatibility.
+#  - Use MobileNetV2 preprocessing (scaling to [-1, 1])
 def preprocess(image, label):
     image = tf.image.resize(image, (324, 324))
     image = tf.cast(image, tf.float32)
     image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
     return image, label
 
-train_ds = ds_train.map(preprocess)
+# Prepare the training and validation datasets:
+# - .map(preprocess): Applies our preprocessing function to each sample.
+# - .shuffle(1000): Randomizes the order of training samples for better generalization.
+# - .batch(32): Combines samples into batches for efficient training.
+# - .prefetch(tf.data.AUTOTUNE): Overlaps data preprocessing and model execution for performance.
+# The order is important: map first (preprocesses each image), shuffle (randomizes), batch (groups),
+# then prefetch (pipelines batches to the GPU/CPU efficiently).
+train_ds = ds_train.map(preprocess).shuffle(1000).batch(32).prefetch(tf.data.AUTOTUNE)
 val_ds = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
 
-# Load unrelated "none" images from a different dataset
-ds_none_raw = tfds.load(
-    'cifar10',
-    split='train[:10%]',
-    as_supervised=True
-)
-
-# Relable flower images as class 2 for 'none'
-def filter_none_classes(image, label): 
-    return tf.logical_and(tf.not_equal(label, 3), tf.not_equal(label, 5))
-
-def relabel_and_preprocess(image, label):
-    image = tf.image.resize(image, (324, 324))
-    image = tf.cast(image, tf.float32)
-    image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
-    return image, tf.constant(2, dtype=tf.int64)
-
-ds_none = ds_none_raw.filter(filter_none_classes).map(relabel_and_preprocess)
-train_ds_combined = train_ds.concatenate(ds_none).repeat().shuffle(1000).batch(32).prefetch(tf.data.AUTOTUNE)
-
-# Estimate total number of training samples
-num_train_samples = 18640  # 80% of cats_vs_dogs (23200 total)
-num_none_samples = 5000    # 10% of cifar10 (50000 total)
-total_samples = num_train_samples + num_none_samples
-batch_size = 32
-steps_per_epoch = total_samples // batch_size
-
-# 5. Train model
+# Train the model
 history = model.fit(
-    train_ds_combined,
+    train_ds,
     validation_data=val_ds,
-    epochs=5,
-    steps_per_epoch=steps_per_epoch
+    epochs=3,
 )
 
 # Save the Keras model
 model.save("mobilenetv2_catdog.h5")
 
-# Convert to TFLite model with quantization
+# Define a representative dataset generator for post-training quantisation:
+# - Provides sample input data for the converter to calibrate activations and weights.
+# - Ensures quantised model accuracy by matching input distribution.
 def representative_data_gen(): 
     for image, _ in ds_train.take(100):
         image = tf.image.resize(image, (324, 324))
@@ -103,6 +93,11 @@ def representative_data_gen():
         image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
         yield [tf.expand_dims(image, axis=0)]
 
+# Convert to a quantizsd TFLite model for EdgeTPU:
+# - optimisations=[Optimize.DEFAULT]: Enables post-training quantisation:.
+# - representative_dataset: Supplies sample data for calibration.
+# - target_spec.supported_ops: Restricts ops to INT8 only for full quantisation:.
+# - inference_input_type/inference_output_type: Set to uint8 for EdgeTPU compatibility.
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 converter.representative_dataset = representative_data_gen
