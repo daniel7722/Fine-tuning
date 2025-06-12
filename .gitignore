@@ -176,4 +176,8 @@ pyrightconfig.json
 # macOS
 .DS_Store
 
+.prettierrc
+.vscode
+
+
 # End of https://www.toptal.com/developers/gitignore/api/python
