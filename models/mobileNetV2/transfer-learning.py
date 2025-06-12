@@ -16,7 +16,7 @@ devices such as the Coral Edge TPU.
 
 
 # MobileNetV2 is loaded without its classification head, and its weight are frozen to leverage
-# pretrained feature from ImageNet, allowing transfer learning on a new dataset. 
+# pretrained feature from ImageNet, allowing transfer learning on a new dataset.
 base_model = MobileNetV2(
     input_shape=(324, 324, 3), # Customised input shape to match EdgeTPU camera spec
     include_top=False,
@@ -25,8 +25,8 @@ base_model = MobileNetV2(
 base_model.trainable = False  # Freeze base
 
 
-# The classification head consists of a global acverage pooling layer (to reduce spatial dimensions), 
-# a dense intermediate layer (for learning new representations), and a final dense layer with softmax 
+# The classification head consists of a global acverage pooling layer (to reduce spatial dimensions),
+# a dense intermediate layer (for learning new representations), and a final dense layer with softmax
 # activation for binary classification.
 model = models.Sequential([
     base_model,
