@@ -116,16 +116,14 @@ class Agent:
         :param peer_agents: List of Agent instances to send delta to.
         """
         for peer in peer_agents:
-            peer.receive_delta(self.agent_id, self.delta)
+            peer.receive_delta(self.delta)
 
-    def receive_delta(self, from_agent_id, delta):
+    def receive_delta(self, delta):
         """
         Receive a delta from a peer; can buffer for aggregation.
         """
         # Buffer deltas externally, or implement as needed
-        self._peer_deltas.append((from_agent_id, delta))
-
-        pass
+        self._peer_deltas.append(delta)
 
     def evaluate(self, validation_loader):
         """
