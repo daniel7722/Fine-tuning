@@ -179,5 +179,8 @@ pyrightconfig.json
 .prettierrc
 .vscode
 
+imagenette/
+splits/
+imagenette2.tar
 
 # End of https://www.toptal.com/developers/gitignore/api/python

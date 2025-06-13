@@ -70,7 +70,7 @@ class Agent:
         for step in range(num):
             imgs, targets = next(self.data_loader)
             
-            with tf.GradientTape() as tape: 
+            with tf.GradientTape() as tape:
                 logits = self.model(imgs, training=True)
                 loss = loss_fn(targets, logits)
             grads = tape.gradient(loss, self.model.trainable_weights)
