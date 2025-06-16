@@ -99,3 +99,4 @@ round,agent_id,metric,value
 9,7,loss,94.12201
 9,8,loss,64.66036
 9,9,loss,115.90383
+Catastrophic Forgetting,,,

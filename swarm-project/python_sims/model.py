@@ -25,68 +25,70 @@ def model_factory():
 
     return model
 
-model = model_factory()
+def train_model(): 
 
-ds_train, ds_info = tfds.load(
-    'imagenette/160px',
-    split='train',
-    as_supervised=True,
-    with_info=True
-)
+    model = model_factory()
 
-ds_val = tfds.load(
-    'imagenette/160px',
-    split='validation',
-    as_supervised=True
-)
+    ds_train, ds_info = tfds.load(
+        'imagenette/160px',
+        split='train',
+        as_supervised=True,
+        with_info=True
+    )
 
-def preprocess(image, label):
-    image = tf.image.resize(image, (160, 160))
-    image = tf.cast(image, tf.float32)
-    image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
-    return image, label
+    ds_val = tfds.load(
+        'imagenette/160px',
+        split='validation',
+        as_supervised=True
+    )
 
-def augment(image, label):
-    image = tf.image.random_flip_left_right(image)
-    image = tf.image.random_brightness(image, 0.2)
-    return image, label
+    def preprocess(image, label):
+        image = tf.image.resize(image, (160, 160))
+        image = tf.cast(image, tf.float32)
+        image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
+        return image, label
 
-ds_train = (
-    ds_train
-      .map(preprocess)
-      .map(augment)
-      .shuffle(1000)
-      .batch(32)
-      .prefetch(tf.data.AUTOTUNE)
-)
+    def augment(image, label):
+        image = tf.image.random_flip_left_right(image)
+        image = tf.image.random_brightness(image, 0.2)
+        return image, label
 
-ds_val = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
+    ds_train = (
+        ds_train
+        .map(preprocess)
+        .map(augment)
+        .shuffle(1000)
+        .batch(32)
+        .prefetch(tf.data.AUTOTUNE)
+    )
 
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-    metrics=['accuracy']
-)
-callbacks = [
-    EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
-    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, min_lr=1e-6)
-]
+    ds_val = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
 
-model.fit(ds_train, validation_data=ds_val, epochs=5, callbacks=callbacks)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+        metrics=['accuracy']
+    )
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, min_lr=1e-6)
+    ]
 
-# Fine-tuning the model by unfreezing the last 20 layers
-fine_tuned_callbacks = [
-    EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
-    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1)
-]
-for layer in model.layers[-20:]:
-    layer.trainable = True  # Unfreeze the last 20 layers for fine-tuning
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-    metrics=['accuracy']
-)
-model.fit(ds_train, validation_data=ds_val, epochs=3, callbacks=fine_tuned_callbacks)
+    model.fit(ds_train, validation_data=ds_val, epochs=5, callbacks=callbacks)
+
+    # Fine-tuning the model by unfreezing the last 20 layers
+    fine_tuned_callbacks = [
+        EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1)
+    ]
+    for layer in model.layers[-20:]:
+        layer.trainable = True  # Unfreeze the last 20 layers for fine-tuning
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+        metrics=['accuracy']
+    )
+    model.fit(ds_train, validation_data=ds_val, epochs=3, callbacks=fine_tuned_callbacks)
 
 """
 The original imagenet has 1000 classes but the imagenette dataset has only 10 classes. Therefore, the model is frozen 
