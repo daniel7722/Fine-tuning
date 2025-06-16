@@ -26,11 +26,17 @@ def model_factory():
 
 model = model_factory()
 
-(ds_train, ds_val), ds_info = tfds.load(
+ds_train, ds_info = tfds.load(
     'imagenette/160px',
-    split=['train[:80%]', 'train[80%:]'],
+    split='train',
     as_supervised=True,
     with_info=True
+)
+
+ds_val = tfds.load(
+    'imagenette/160px',
+    split='validation',
+    as_supervised=True
 )
 
 def preprocess(image, label):
@@ -39,7 +45,20 @@ def preprocess(image, label):
     image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
     return image, label
 
-ds_train = ds_train.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
+def augment(image, label):
+    image = tf.image.random_flip_left_right(image)
+    image = tf.image.random_brightness(image, 0.2)
+    return image, label
+
+ds_train = (
+    ds_train
+      .map(preprocess)
+      .map(augment)
+      .shuffle(1000)
+      .batch(32)
+      .prefetch(tf.data.AUTOTUNE)
+)
+
 ds_val = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
 
 model.compile(
@@ -59,21 +78,23 @@ model.compile(
     metrics=['accuracy']
 )
 model.fit(ds_train, validation_data=ds_val, epochs=2)
+
 """
 The original imagenet has 1000 classes but the imagenette dataset has only 10 classes. Therefore, the model is frozen 
 for the first 3 epochs to avoid overfitting or catastrophic forgetting on smaller dataset. Then, the last 20 layers are
-unfrozen for fine-tuning the model with much smaller learning rate.
+unfrozen for fine-tuning the model with much smaller learning rate. Since imagenette is seriously small compared to imagenet,
+data augmentation is applied to the training dataset to improve generalization.
 Results of this model training is: 
 
 Epoch 1/3
-2025-06-16 15:25:42.721550: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:387] The default buffer size is 262144, which is overridden by the user specified `buffer_size` of 8388608
-323/323 ━━━━━━━━━━━━━━━━━━━━ 35s 103ms/step - accuracy: 0.8374 - loss: 0.5859 - val_accuracy: 0.9794 - val_loss: 0.0757
+2025-06-16 15:33:46.615598: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:387] The default buffer size is 262144, which is overridden by the user specified `buffer_size` of 8388608
+403/403 ━━━━━━━━━━━━━━━━━━━━ 36s 86ms/step - accuracy: 0.8585 - loss: 0.4991 - val_accuracy: 0.9640 - val_loss: 0.1187
 Epoch 2/3
-323/323 ━━━━━━━━━━━━━━━━━━━━ 35s 108ms/step - accuracy: 0.9870 - loss: 0.0523 - val_accuracy: 0.9818 - val_loss: 0.0659
+403/403 ━━━━━━━━━━━━━━━━━━━━ 34s 85ms/step - accuracy: 0.9855 - loss: 0.0541 - val_accuracy: 0.9640 - val_loss: 0.1327
 Epoch 3/3
-323/323 ━━━━━━━━━━━━━━━━━━━━ 36s 111ms/step - accuracy: 0.9942 - loss: 0.0294 - val_accuracy: 0.9794 - val_loss: 0.0598
+403/403 ━━━━━━━━━━━━━━━━━━━━ 37s 92ms/step - accuracy: 0.9916 - loss: 0.0313 - val_accuracy: 0.9640 - val_loss: 0.1191
 Epoch 1/2
-323/323 ━━━━━━━━━━━━━━━━━━━━ 45s 133ms/step - accuracy: 0.9780 - loss: 0.0805 - val_accuracy: 0.9814 - val_loss: 0.0571
+403/403 ━━━━━━━━━━━━━━━━━━━━ 44s 105ms/step - accuracy: 0.9824 - loss: 0.0629 - val_accuracy: 0.9660 - val_loss: 0.1118
 Epoch 2/2
-323/323 ━━━━━━━━━━━━━━━━━━━━ 42s 131ms/step - accuracy: 0.9912 - loss: 0.0395 - val_accuracy: 0.9822 - val_loss: 0.0566
+403/403 ━━━━━━━━━━━━━━━━━━━━ 41s 102ms/step - accuracy: 0.9854 - loss: 0.0516 - val_accuracy: 0.9680 - val_loss: 0.1093
 """
