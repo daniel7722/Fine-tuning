@@ -4,6 +4,7 @@ import numpy as np
 import os
 
 BATCH_SIZE = 32
+VALIDATION_LIMIT = 200  # maximum number of validation images to load
 TRAIN_DIR = 'data/imagenette/train'
 
 # Build a mapping from class names to integer labels based on Imagenette folder names
@@ -63,8 +64,22 @@ def get_validation_loader():
     img_paths = sorted(glob.glob(f"{val_dir}/*/*.JPEG"))
     while True:
         for i in range(0, len(img_paths), BATCH_SIZE):
-            print(f"Loading validation batch {i // BATCH_SIZE + 1}")
             batch_paths = img_paths[i:i + BATCH_SIZE]
             images = [load_and_preprocess(p) for p in batch_paths]
             targets = [load_label(p) for p in batch_paths]
             yield np.stack(images), np.array(targets)
+            
+
+def get_shuffled_validation_loader():
+    """
+    Returns an iterator over a shuffled subset of the shared validation set.
+    """
+    val_dir = 'data/imagenette/val'
+    img_paths = sorted(glob.glob(f"{val_dir}/*/*.JPEG"))
+    random.shuffle(img_paths)
+    img_paths = img_paths[:VALIDATION_LIMIT]
+    for i in range(0, len(img_paths), BATCH_SIZE):
+        batch_paths = img_paths[i:i + BATCH_SIZE]
+        images = [load_and_preprocess(p) for p in batch_paths]
+        targets = [load_label(p) for p in batch_paths]
+        yield np.stack(images), np.array(targets)

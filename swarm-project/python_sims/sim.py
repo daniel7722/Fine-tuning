@@ -3,7 +3,7 @@ import random
 import os
 import csv
 from agent_interface import Agent
-from dataset import data_loader_for, get_validation_loader
+from dataset import data_loader_for, get_validation_loader, get_shuffled_validation_loader
 from model import model_factory
 
 # from dataset import data_loader_for
@@ -18,7 +18,7 @@ with open('configs/agent_config.yaml') as f:
     agent_config = yaml.safe_load(f)
 
 # Prepare validation loader
-validation_loader = get_validation_loader()
+validation_loader = get_shuffled_validation_loader()
 
 # Instantiate agents
 agents = [
