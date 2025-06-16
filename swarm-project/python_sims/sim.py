@@ -4,18 +4,17 @@ import os
 import csv
 from agent_interface import Agent
 from dataset import data_loader_for, get_validation_loader
-# from model import model_factory
+from model import model_factory
 
 # from dataset import data_loader_for
 loader = data_loader_for(0)
 imgs, labels = next(loader)
 print(imgs.shape, labels.shape)  # e.g. (batch_size, H, W, C), (batch_size,)
 
-"""
 # Load configs
 with open('configs/sim_config.yaml') as f:
     sim_config = yaml.safe_load(f)
-with open('configs/agent_config.yaml') as f:s
+with open('configs/agent_config.yaml') as f:
     agent_config = yaml.safe_load(f)
 
 # Prepare validation loader
@@ -58,5 +57,3 @@ with open(log_path, 'w', newline='') as csvfile:
             metrics = agent.evaluate(validation_loader)
             for name, val in metrics.items():
                 writer.writerow([rnd, agent.agent_id, name, val])
-
-"""

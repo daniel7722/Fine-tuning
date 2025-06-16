@@ -20,6 +20,7 @@ class Agent:
         self.model = model_factory()
         self.config = config
         self.optimizer = self._init_optimizer()
+        self.loss_fn = self._init_loss_fn()
         self._prev_weights = self._get_weights()
         self.delta = None
         self._peer_deltas = []  # Buffer for received deltas
@@ -37,6 +38,19 @@ class Agent:
             return tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_type}")
+        
+    def _init_loss_fn(self):
+        """
+        Initialize loss function based on config (e.g., categorical crossentropy).
+        """
+        loss_type = self.config.get('loss_fn', 'categorical_crossentropy')
+        
+        if loss_type == 'categorical_crossentropy':
+            return tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        elif loss_type == 'sparse_categorical_crossentropy':
+            return tf.keras.losses.SparseCategoricalCrossentropy()
+        else:
+            raise ValueError(f"Unsupported loss function: {loss_type}")
 
     def _get_weights(self):
         """
@@ -63,10 +77,11 @@ class Agent:
         Perform local training for a given number of batches.
         Updates the model in-place.
         """
+        print(f"Agent {self.agent_id} starting local training")
         # Determine how many batches to train; default from config
         num = num_batches or self.config.get('batches_per_round', 2)
         loss = None
-        loss_fn = self.config.get('loss_fn')
+        loss_fn = self.loss_fn
         for step in range(num):
             imgs, targets = next(self.data_loader)
             
@@ -86,6 +101,7 @@ class Agent:
         Compute the weight delta since the last snapshot.
         Stores it in self.delta.
         """
+        print(f"Agent {self.agent_id} computing delta")
         current = self._get_weights()
         # Delta = current - previous
         self.delta = current - self._prev_weights
@@ -102,6 +118,7 @@ class Agent:
         Aggregate a list of peer deltas with self.delta and apply to model.
         :param deltas: List of numpy arrays of the same shape as self.delta
         """
+        print(f"Agent {self.agent_id} applying deltas from {len(self._peer_deltas)} peers")
         assert all(d.shape == self.delta.shape for d in deltas)
         all_deltas = self._peer_deltas + [self.delta]
         self._peer_deltas.clear()  # Clear after aggregation
@@ -115,6 +132,7 @@ class Agent:
         Share self.delta with selected peers.
         :param peer_agents: List of Agent instances to send delta to.
         """
+        print(f"Agent {self.agent_id} gossiping delta to {len(peer_agents)} peers")
         for peer in peer_agents:
             peer.receive_delta(self.delta)
 
@@ -131,10 +149,11 @@ class Agent:
         :param validation_loader: Iterable of (images, targets) for evaluation.
         :return: Metric dict (e.g., {'mAP': value})
         """
+        print(f"Agent {self.agent_id} evaluating model on validation set")
         # Run inference on validation_loader and compute metrics
         total_loss = 0.0
         num_samples = 0
-        loss_fn = self.config.get('loss_fn')
+        loss_fn = self.loss_fn
         for imgs, targets in validation_loader:
             logits = self.model(imgs, training=False)
             loss = loss_fn(targets, logits)
