@@ -17,9 +17,6 @@ with open('configs/sim_config.yaml') as f:
 with open('configs/agent_config.yaml') as f:
     agent_config = yaml.safe_load(f)
 
-# Prepare validation loader
-validation_loader = get_shuffled_validation_loader()
-
 # Instantiate agents
 agents = [
     Agent(i, data_loader_for(i), model_factory, agent_config)
@@ -35,6 +32,7 @@ with open(log_path, 'w', newline='') as csvfile:
 
     # Simulation loop
     for rnd in range(sim_config.get('num_rounds', 10)):
+        print(f"Round {rnd + 1}/{sim_config.get('num_rounds', 10)}")
         # Local training and delta computation
         for agent in agents:
             agent.train()
@@ -54,6 +52,7 @@ with open(log_path, 'w', newline='') as csvfile:
 
         # Evaluation and logging
         for agent in agents:
+            validation_loader = get_shuffled_validation_loader()
             metrics = agent.evaluate(validation_loader)
             for name, val in metrics.items():
                 writer.writerow([rnd, agent.agent_id, name, val])

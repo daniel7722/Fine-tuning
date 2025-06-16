@@ -147,7 +147,7 @@ class Agent:
         """
         Evaluate current model performance on a validation set.
         :param validation_loader: Iterable of (images, targets) for evaluation.
-        :return: Metric dict (e.g., {'mAP': value})
+        :return: Metric dict (e.g., {'loss': value})
         """
         print(f"Agent {self.agent_id} evaluating model on validation set")
         # Run inference on validation_loader and compute metrics

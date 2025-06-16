@@ -1,6 +1,5 @@
 batches_per_round: 2
 learning_rate: 0.001
 optimizer: "adam"
-batches_per_round: 2
 loss_fn: 'sparse_categorical_crossentropy'
-log_interval: 10
+log_interval: 1

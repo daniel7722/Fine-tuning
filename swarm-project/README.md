@@ -1,6 +1,6 @@
 # Swarm Project for Edge Devices. 
 
-This is my attempt at creating a swarm learning environment. The scope of this project involve training multiple devices in swarm learning settings, using python simulation to engage 10 devices that each host a base model but run independently with local data. In certain period of time, training or fine-tuning will be conducted to update weights with P2P gossip protocol and achieve a global model training. There are related works that utilised decentralised federated learning to achieve distributed training and is on par with the performance of centralised federated learning. In view of this, this project will mainly be focusing on on-device training/find-tuning with quantised models.
+This is my attempt at creating a swarm learning environment. The scope of this project involve training multiple devices in swarm learning settings, using python simulation to engage 10 devices that each host a base model but run independently with local data. Training or fine-tuning will be conducted regularly to update weights with P2P gossip protocol and achieve a global model training. There are related works that utilised decentralised federated learning to achieve distributed training and is on par with the performance of centralised federated learning. In view of this, this project will mainly be focusing on using generative AI instead of simple CNN or RNN.
 
 ``` 
 swarm-project/
@@ -9,8 +9,8 @@ swarm-project/
 │   ├── base_model.tflite
 │   └── edge_tpu_compiled/      ← output of edgetpu_compiler
 │       └── base_model_edgetpu.tflite
-├── data/                       ← Datasets & splits (COCO subsets, synthetic)
-│   ├── coco_subset/
+├── data/                       ← Datasets & splits 
+│   ├── imagenette/
 │   └── splits/
 │       ├── agent_00/
 │       ├── agent_01/
@@ -29,9 +29,6 @@ swarm-project/
 │   ├── sim.py                  ← orchestrates agents, rounds, gossip
 │   ├── agent_interface.py      ← Agent class (train, gossip, eval)
 │   ├── dataset.py              ← loaders, partition logic
-│   ├── utils.py                ← mAP/eval, logging helpers
-│   └── notebooks/              ← exploratory Jupyter notebooks
-│       └── initial_exploration.ipynb
 │
 ├── cpp_agent/                  ← your C++ agent code & build files
 │   ├── CMakeLists.txt          ← builds libcoral, TFLite, edgetpu delegate
@@ -43,8 +40,21 @@ swarm-project/
 │   └── third_party/            ← e.g., ZeroMQ, absl, Eigen submodules
 │
 ├── scripts/                    ← helper scripts
+│   ├── split.sh                ← spliting imagenette to each agent (extremely biased)
 │   ├── build_cpp.sh            ← bootstrap CMake build for cpp_agent
 │   ├── run_sim.sh              ← launches python_sim with config
 │   └── collect_metrics.py      ← post-run aggregator/plotter
 └── .gitignore
 ```
+
+
+## 06-16
+### Python simulation environement setup
+
+Procedure: 
+- Distributed 10 different classes' dataset to 10 different agents with each agent only see one class but not the other. 
+- At each round, agents train with local dataset, gossip its weight deltas to 2 random peers, apply other agent's deltas to their own model weight, and validate on randomly selected data. 
+- Repeat step 2 for 10 rounds. 
+
+The results show an evident ***catastrophic forgetting***. At each round, agent adapt other overfitted model weights and worsen the validation loss over time. 
+
