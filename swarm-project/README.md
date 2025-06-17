@@ -58,3 +58,7 @@ Procedure:
 
 The results show an evident ***catastrophic forgetting***. At each round, agent adapt other overfitted model weights and worsen the validation loss over time. 
 
+## 06-17
+### Swarm learning
+As yesterday was building python simulation, and today is more towards implementing the swarm feature such as social term, cognitive term, and inertia term. And here we go the tweaking. With the same hyperparameters - 10 rounds, 2 batches per round. Swarm learning performed quite poorly and is not able to consistently converge across devices. Therefore, we are going to do some hyperparameter tweaking now. 
+
