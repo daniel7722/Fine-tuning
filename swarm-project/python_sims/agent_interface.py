@@ -204,8 +204,10 @@ class Agent:
             + self.c1 * r1 * (self.pbest_weights - current)
             + self.c2 * r2 * (global_best_weights - current)
         )
-
+        if (self.config.get('pso_velocity_limit') is not None):
+            new_vel = np.clip(new_vel, -self.config['pso_velocity_limit'], self.config['pso_velocity_limit'])
         self.velocity = new_vel
+        
         # Position update
         new_pos = current + new_vel
         self._set_weights(new_pos)

@@ -1,8 +1,9 @@
-batches_per_round: 2
+batches_per_round: 6
 learning_rate: 0.001
 optimizer: "adam"
 loss_fn: 'sparse_categorical_crossentropy'
-log_interval: 1
-pso_c1: 1.5
+log_interval: 3
+pso_c1: 0.8
 pso_c2: 1.5
-pso_w: 0.9
+pso_w: 0.5
+pso_velocity_limit: 0.1
