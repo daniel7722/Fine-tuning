@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import threading
 
 
 class Agent:
@@ -24,6 +25,7 @@ class Agent:
         self._prev_weights = self._get_weights()
         self.delta = None
         self._peer_deltas = []  # Buffer for received deltas
+        self._lock = threading.Lock()  # Thread-safe access to deltas
 
     def _init_optimizer(self):
         """
@@ -120,8 +122,10 @@ class Agent:
         """
         print(f"Agent {self.agent_id} applying deltas from {len(self._peer_deltas)} peers")
         assert all(d.shape == self.delta.shape for d in deltas)
-        all_deltas = self._peer_deltas + [self.delta]
-        self._peer_deltas.clear()  # Clear after aggregation
+        with self._lock:
+            peer_deltas = list(self._peer_deltas)  # Copy to avoid
+            self._peer_deltas.clear()  # Clear after aggregation
+        all_deltas = peer_deltas + [self.delta]
         mean_delta = np.mean(all_deltas, axis=0)
         # Apply mean_delta to model weights
         final_weights = self._get_weights() + mean_delta
@@ -141,7 +145,8 @@ class Agent:
         Receive a delta from a peer; can buffer for aggregation.
         """
         # Buffer deltas externally, or implement as needed
-        self._peer_deltas.append(delta)
+        with self._lock:
+            self._peer_deltas.append(delta)
 
     def evaluate(self, validation_loader):
         """
