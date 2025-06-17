@@ -1,9 +1,9 @@
-import yaml
 import random
 import os
 import csv
 import threading
 import logging
+import yaml
 from agent_interface import Agent
 from dataset import data_loader_for, get_validation_set
 from model import model_factory
@@ -13,6 +13,11 @@ with open('configs/sim_config.yaml') as f:
     sim_config = yaml.safe_load(f)
 with open('configs/agent_config.yaml') as f:
     agent_config = yaml.safe_load(f)
+
+# PSO global best (shared)
+gbest_weights = None
+gbest_loss = float('inf')
+gbest_lock = threading.Lock()
 
 # Prepare global validation set
 validation_batches = list(get_validation_set())
@@ -29,7 +34,8 @@ with open(log_path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(['round', 'agent_id', 'metric', 'value'])
 
-def agent_worker(agent): 
+def agent_worker(agent):
+    global gbest_loss, gbest_weights
     for round_idx in range(sim_config.get('num_rounds', 10)):
         agent.train()
         agent.compute_delta()
@@ -39,21 +45,28 @@ def agent_worker(agent):
         )
         agent.gossip(peers)
         barrier.wait()
-        agent.apply_deltas([])
+
         metrics = agent.evaluate(validation_batches)
         for name, val in metrics.items():
             with log_lock:
                 with open(log_path, 'a', newline='') as csvfile:
                     writer = csv.writer(csvfile)
                     writer.writerow([round_idx, agent.agent_id, name, val])
+        with gbest_lock: 
+            if metrics['loss'] < gbest_loss:
+                gbest_loss = metrics['loss']
+                gbest_weights = agent._get_weights().copy()
+        barrier.wait()
+
+        agent.apply_pso(gbest_weights)
         barrier.wait()
 
 threads = []
-for agent in agents: 
+for agent in agents:
     t = threading.Thread(target=agent_worker, args=(agent,))
     t.start()
     threads.append(t)
-for t in threads: 
+for t in threads:
     t.join()
 
 # # Prepare logging

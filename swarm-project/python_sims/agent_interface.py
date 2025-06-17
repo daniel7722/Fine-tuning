@@ -27,6 +27,15 @@ class Agent:
         self._peer_deltas = []  # Buffer for received deltas
         self._lock = threading.Lock()  # Thread-safe access to deltas
 
+        #PSO state
+        self.pbest_weights = self._prev_weights.copy()
+        self.pbest_loss = float('inf')
+        self.velocity = np.zeros_like(self._prev_weights)
+        # PSO parameters
+        self.c1 = self.config.get('pso_c1', 1.5)  # Cognitive coefficient
+        self.c2 = self.config.get('pso_c2', 1.5)  # Social coefficient
+        self.w = self.config.get('pso_w', 0.9)  # Inertia weight for velocity update
+
     def _init_optimizer(self):
         """
         Initialize optimizer based on config (e.g., SGD, Adam).
@@ -167,6 +176,9 @@ class Agent:
         avg_loss = total_loss / num_samples if num_samples > 0 else 0.0
 
         print(f"Agent {self.agent_id} - Validation loss: {avg_loss}")
+        if avg_loss < self.pbest_loss: 
+            self.pbest_loss = avg_loss
+            self.pbest_weights = self._get_weights().copy()
 
         return {'loss': avg_loss}
 
@@ -179,3 +191,22 @@ class Agent:
         self.delta = None
         self._peer_deltas.clear()
         self.optimizer = self._init_optimizer()
+
+    def apply_pso(self, global_best_weights): 
+        """
+        PSO velocity+position update using personal best and global best.
+        """
+        current = self._get_weights()
+        r1, r2 = np.random.rand(), np.random.rand()
+        # Velocity update
+        new_vel = (
+            self.w * self.velocity
+            + self.c1 * r1 * (self.pbest_weights - current)
+            + self.c2 * r2 * (global_best_weights - current)
+        )
+
+        self.velocity = new_vel
+        # Position update
+        new_pos = current + new_vel
+        self._set_weights(new_pos)
+        self._prev_weights = new_pos.copy()
