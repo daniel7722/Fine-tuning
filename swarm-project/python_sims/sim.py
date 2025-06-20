@@ -2,46 +2,46 @@ import random
 import os
 import csv
 import threading
-import logging
 import yaml
 from agent_interface import Agent
 from dataset import data_loader_for, get_validation_set
 from model import mobilenet_factory
 
 # Load configs
-with open('configs/sim_config.yaml') as f:
+with open("configs/sim_config.yaml") as f:
     sim_config = yaml.safe_load(f)
-with open('configs/agent_config.yaml') as f:
+with open("configs/agent_config.yaml") as f:
     agent_config = yaml.safe_load(f)
 
 # PSO global best (shared)
 gbest_weights = None
-gbest_loss = float('inf')
+gbest_loss = float("inf")
 gbest_lock = threading.Lock()
 
 # Prepare global validation set
 validation_batches = list(get_validation_set())
 
-barrier = threading.Barrier(sim_config.get('num_agents', 1))
+barrier = threading.Barrier(sim_config.get("num_agents", 1))
 agents = [
     Agent(i, data_loader_for(i), mobilenet_factory, agent_config)
-    for i in range(sim_config['num_agents'])
+    for i in range(sim_config["num_agents"])
 ]
 
-log_path = os.path.join('logs', 'metrics.csv')
+log_path = os.path.join("logs", "metrics.csv")
 log_lock = threading.Lock()
-with open(log_path, 'w', newline='') as csvfile:
+with open(log_path, "w", newline="") as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(['round', 'agent_id', 'metric', 'value'])
+    writer.writerow(["round", "agent_id", "metric", "value"])
+
 
 def agent_worker(agent):
     global gbest_loss, gbest_weights
-    for round_idx in range(sim_config.get('num_rounds', 10)):
+    for round_idx in range(sim_config.get("num_rounds", 10)):
         agent.train()
         agent.compute_delta()
         peers = random.sample(
             [a for a in agents if a.agent_id != agent.agent_id],
-            sim_config.get('peer_count', 2)
+            sim_config.get("peer_count", 2),
         )
         agent.gossip(peers)
         barrier.wait()
@@ -49,17 +49,18 @@ def agent_worker(agent):
         metrics = agent.evaluate(validation_batches)
         for name, val in metrics.items():
             with log_lock:
-                with open(log_path, 'a', newline='') as csvfile:
+                with open(log_path, "a", newline="") as csvfile:
                     writer = csv.writer(csvfile)
                     writer.writerow([round_idx, agent.agent_id, name, val])
-        with gbest_lock: 
-            if metrics['loss'] < gbest_loss:
-                gbest_loss = metrics['loss']
+        with gbest_lock:
+            if metrics["loss"] < gbest_loss:
+                gbest_loss = metrics["loss"]
                 gbest_weights = agent._get_weights().copy()
         barrier.wait()
 
         agent.apply_pso(gbest_weights)
         barrier.wait()
+
 
 threads = []
 for agent in agents:

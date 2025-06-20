@@ -9,7 +9,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from dataset import class_to_idx
 
-def mobilenet_factory(): 
+
+def mobilenet_factory():
     """
     Constructs a MobileNetV2-based classification model for the number of classes
     defined in dataset.class_to_idx.
@@ -17,19 +18,17 @@ def mobilenet_factory():
     num_classes = len(class_to_idx)
 
     base_model = MobileNetV2(
-        weights='imagenet',
-        input_shape=(160, 160, 3),
-        include_top=False,
-        pooling='avg'
+        weights="imagenet", input_shape=(160, 160, 3), include_top=False, pooling="avg"
     )
-    base_model.trainable = False # Freeze the base model
+    base_model.trainable = False  # Freeze the base model
 
     inputs = base_model.input
     x = base_model.output
-    outputs = Dense(num_classes, activation='softmax')(x)
+    outputs = Dense(num_classes, activation="softmax")(x)
     model = Model(inputs=inputs, outputs=outputs)
 
     return model
+
 
 def vit_factory():
     """
@@ -38,17 +37,17 @@ def vit_factory():
     """
     num_classes = len(class_to_idx)
     model = TFViTForImageClassification.from_pretrained(
-        "google/vit-base-patch16-224-in21k",
-        num_labels=num_classes
+        "google/vit-base-patch16-224-in21k", num_labels=num_classes
     )
     # Freeze the ViT backbone
     model.vit.trainable = False
 
     return model
 
+
 def train_vit():
     """
-    This is just a start. Let me cook. 
+    This is just a start. Let me cook.
     Epoch 1/5
     WARNING:tensorflow:AutoGraph could not transform <function infer_framework at 0x106fc7250> and will run it as-is.
     Cause: for/else statement not yet supported
@@ -70,20 +69,13 @@ def train_vit():
 
     # Build the model
     model = vit_factory()
-    
+
     # Load datasets
     ds_train, ds_info = tfds.load(
-        'imagenette/160px',
-        split='train',
-        as_supervised=True,
-        with_info=True
+        "imagenette/160px", split="train", as_supervised=True, with_info=True
     )
-    ds_val = tfds.load(
-        'imagenette/160px',
-        split='validation',
-        as_supervised=True
-    )
-    
+    ds_val = tfds.load("imagenette/160px", split="validation", as_supervised=True)
+
     # Preprocessing and augmentation
     def preprocess(image, label):
         # Resize to the ViT’s expected input size
@@ -104,19 +96,13 @@ def train_vit():
         return image, label
 
     ds_train = (
-        ds_train
-        .map(preprocess)
+        ds_train.map(preprocess)
         .map(augment)
         .shuffle(1000)
         .batch(32)
         .prefetch(tf.data.AUTOTUNE)
     )
-    ds_val = (
-        ds_val
-        .map(preprocess)
-        .batch(32)
-        .prefetch(tf.data.AUTOTUNE)
-    )
+    ds_val = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
 
     # Initial training of only the new head
     # Freeze backbone, leave classifier head trainable
@@ -124,9 +110,9 @@ def train_vit():
     model.classifier.trainable = True
 
     model.compile(
-        optimizer='adam',
+        optimizer="adam",
         loss=SparseCategoricalCrossentropy(from_logits=False),
-        metrics=['accuracy']
+        metrics=["accuracy"],
     )
     # callbacks = [
     #     EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
@@ -134,13 +120,14 @@ def train_vit():
     # ]
     model.fit(ds_train, validation_data=ds_val, epochs=5)
 
+
 def train_mobilenet():
     """
-    The original imagenet has 1000 classes but the imagenette dataset has only 10 
+    The original imagenet has 1000 classes but the imagenette dataset has only 10
     classes. Therefore, the model is frozen for the first 3 epochs to avoid overfitting or catastrophic forgetting on smaller dataset. Then, the last 20 layers are
     unfrozen for fine-tuning the model with much smaller learning rate. Since imagenette is seriously small compared to imagenet,
     data augmentation is applied to the training dataset to improve generalization.
-    Results of this model training is: 
+    Results of this model training is:
 
     Epoch 1/5
     2025-06-16 15:46:01.722261: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:387] The default buffer size is 262144, which is overridden by the user specified `buffer_size` of 8388608
@@ -160,17 +147,10 @@ def train_mobilenet():
     model = mobilenet_factory()
 
     ds_train, ds_info = tfds.load(
-        'imagenette/160px',
-        split='train',
-        as_supervised=True,
-        with_info=True
+        "imagenette/160px", split="train", as_supervised=True, with_info=True
     )
 
-    ds_val = tfds.load(
-        'imagenette/160px',
-        split='validation',
-        as_supervised=True
-    )
+    ds_val = tfds.load("imagenette/160px", split="validation", as_supervised=True)
 
     def preprocess(image, label):
         image = tf.image.resize(image, (160, 160))
@@ -184,8 +164,7 @@ def train_mobilenet():
         return image, label
 
     ds_train = (
-        ds_train
-        .map(preprocess)
+        ds_train.map(preprocess)
         .map(augment)
         .shuffle(1000)
         .batch(32)
@@ -197,34 +176,37 @@ def train_mobilenet():
     model.compile(
         optimizer=Adam(learning_rate=0.001),
         loss=SparseCategoricalCrossentropy(from_logits=False),
-        metrics=['accuracy']
+        metrics=["accuracy"],
     )
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, min_lr=1e-6)
+        EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True),
+        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=1, min_lr=1e-6),
     ]
 
     model.fit(ds_train, validation_data=ds_val, epochs=5, callbacks=callbacks)
 
     # Fine-tuning the model by unfreezing the last 20 layers
     fine_tuned_callbacks = [
-        EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1)
+        EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True),
+        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=1),
     ]
     for layer in model.layers[-20:]:
         layer.trainable = True  # Unfreeze the last 20 layers for fine-tuning
     model.compile(
         optimizer=Adam(learning_rate=1e-5),
         loss=SparseCategoricalCrossentropy(from_logits=False),
-        metrics=['accuracy']
+        metrics=["accuracy"],
     )
-    model.fit(ds_train, validation_data=ds_val, epochs=3, callbacks=fine_tuned_callbacks)
+    model.fit(
+        ds_train, validation_data=ds_val, epochs=3, callbacks=fine_tuned_callbacks
+    )
 
 
-def main(): 
+def main():
     # Uncomment the model you want to train
     # train_mobilenet()
     train_vit()
+
 
 if __name__ == "__main__":
     print("GPUs:", tf.config.list_physical_devices("GPU"))

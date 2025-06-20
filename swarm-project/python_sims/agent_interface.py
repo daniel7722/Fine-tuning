@@ -1,11 +1,11 @@
+import threading
 import numpy as np
 import tensorflow as tf
-import threading
 
 
 class Agent:
     """
-    Agent interface for swarm learning simulation. 
+    Agent interface for swarm learning simulation.
     Each agent handles its own local training, delta computation, gossiping, aggregation, and evaluation.
     """
 
@@ -16,7 +16,7 @@ class Agent:
         :param model_factory: Callable that returns a fresh model instance.
         :param config: Dictionary of hyperparameters and settings.
         """
-        self.agent_id = agent_id   
+        self.agent_id = agent_id
         self.data_loader = data_loader
         self.model = model_factory()
         self.config = config
@@ -27,38 +27,38 @@ class Agent:
         self._peer_deltas = []  # Buffer for received deltas
         self._lock = threading.Lock()  # Thread-safe access to deltas
 
-        #PSO state
+        # PSO state
         self.pbest_weights = self._prev_weights.copy()
-        self.pbest_loss = float('inf')
+        self.pbest_loss = float("inf")
         self.velocity = np.zeros_like(self._prev_weights)
         # PSO parameters
-        self.c1 = self.config.get('pso_c1', 1.5)  # Cognitive coefficient
-        self.c2 = self.config.get('pso_c2', 1.5)  # Social coefficient
-        self.w = self.config.get('pso_w', 0.9)  # Inertia weight for velocity update
+        self.c1 = self.config.get("pso_c1", 1.5)  # Cognitive coefficient
+        self.c2 = self.config.get("pso_c2", 1.5)  # Social coefficient
+        self.w = self.config.get("pso_w", 0.9)  # Inertia weight for velocity update
 
     def _init_optimizer(self):
         """
         Initialize optimizer based on config (e.g., SGD, Adam).
         """
-        optimizer_type = self.config.get('optimizer', 'adam')
-        learning_rate = self.config.get('learning_rate', 0.001)
-        
-        if optimizer_type == 'adam':
+        optimizer_type = self.config.get("optimizer", "adam")
+        learning_rate = self.config.get("learning_rate", 0.001)
+
+        if optimizer_type == "adam":
             return tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
+        elif optimizer_type == "sgd":
             return tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
         else:
             raise ValueError(f"Unsupported optimizer: {optimizer_type}")
-        
+
     def _init_loss_fn(self):
         """
         Initialize loss function based on config (e.g., categorical crossentropy).
         """
-        loss_type = self.config.get('loss_fn', 'categorical_crossentropy')
-        
-        if loss_type == 'categorical_crossentropy':
+        loss_type = self.config.get("loss_fn", "categorical_crossentropy")
+
+        if loss_type == "categorical_crossentropy":
             return tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-        elif loss_type == 'sparse_categorical_crossentropy':
+        elif loss_type == "sparse_categorical_crossentropy":
             return tf.keras.losses.SparseCategoricalCrossentropy()
         else:
             raise ValueError(f"Unsupported loss function: {loss_type}")
@@ -68,7 +68,7 @@ class Agent:
         Extract current model weights as a flat list or numpy array.
         """
         return np.concatenate([w.flatten() for w in self.model.get_weights()])
-    
+
     def _set_weights(self, weights):
         """
         Set model weights from a flat list or numpy array.
@@ -79,7 +79,7 @@ class Agent:
         new_weights = []
         for shape in shapes:
             size = np.prod(shape)
-            new_weights.append(weights[start:start + size].reshape(shape))
+            new_weights.append(weights[start : start + size].reshape(shape))
             start += size
         self.model.set_weights(new_weights)
 
@@ -90,21 +90,21 @@ class Agent:
         """
         print(f"Agent {self.agent_id} starting local training")
         # Determine how many batches to train; default from config
-        num = num_batches or self.config.get('batches_per_round', 2)
+        num = num_batches or self.config.get("batches_per_round", 2)
         loss = None
         loss_fn = self.loss_fn
         for step in range(num):
             imgs, targets = next(self.data_loader)
-            
+
             with tf.GradientTape() as tape:
                 logits = self.model(imgs, training=True)
                 loss = loss_fn(targets, logits)
             grads = tape.gradient(loss, self.model.trainable_weights)
             self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
-            if step % self.config.get('log_interval', 1) == 0:
+            if step % self.config.get("log_interval", 1) == 0:
                 print(f"Agent {self.agent_id} - Loss: {loss.numpy()}")
-          
+
         return loss
 
     def compute_delta(self):
@@ -129,7 +129,9 @@ class Agent:
         Aggregate a list of peer deltas with self.delta and apply to model.
         :param deltas: List of numpy arrays of the same shape as self.delta
         """
-        print(f"Agent {self.agent_id} applying deltas from {len(self._peer_deltas)} peers")
+        print(
+            f"Agent {self.agent_id} applying deltas from {len(self._peer_deltas)} peers"
+        )
         assert all(d.shape == self.delta.shape for d in deltas)
         with self._lock:
             peer_deltas = list(self._peer_deltas)  # Copy to avoid
@@ -176,11 +178,11 @@ class Agent:
         avg_loss = total_loss / num_samples if num_samples > 0 else 0.0
 
         print(f"Agent {self.agent_id} - Validation loss: {avg_loss}")
-        if avg_loss < self.pbest_loss: 
+        if avg_loss < self.pbest_loss:
             self.pbest_loss = avg_loss
             self.pbest_weights = self._get_weights().copy()
 
-        return {'loss': avg_loss}
+        return {"loss": avg_loss}
 
     def reset(self):
         """
@@ -192,7 +194,7 @@ class Agent:
         self._peer_deltas.clear()
         self.optimizer = self._init_optimizer()
 
-    def apply_pso(self, global_best_weights): 
+    def apply_pso(self, global_best_weights):
         """
         PSO velocity+position update using personal best and global best.
         """
@@ -204,10 +206,14 @@ class Agent:
             + self.c1 * r1 * (self.pbest_weights - current)
             + self.c2 * r2 * (global_best_weights - current)
         )
-        if (self.config.get('pso_velocity_limit') is not None):
-            new_vel = np.clip(new_vel, -self.config['pso_velocity_limit'], self.config['pso_velocity_limit'])
+        if self.config.get("pso_velocity_limit") is not None:
+            new_vel = np.clip(
+                new_vel,
+                -self.config["pso_velocity_limit"],
+                self.config["pso_velocity_limit"],
+            )
         self.velocity = new_vel
-        
+
         # Position update
         new_pos = current + new_vel
         self._set_weights(new_pos)
