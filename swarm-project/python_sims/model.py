@@ -7,7 +7,31 @@ from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from dataset import class_to_idx
+
+class_names = [
+    "n01440764",
+    "n02102040",
+    "n02979186",
+    "n03000684",
+    "n03028079",
+    "n03394916",
+    "n03417042",
+    "n03425413",
+    "n03445777",
+    "n03888257",
+]
+class_to_idx = {
+    "n01440764": 0,
+    "n02102040": 1,
+    "n02979186": 2,
+    "n03000684": 3,
+    "n03028079": 4,
+    "n03394916": 5,
+    "n03417042": 6,
+    "n03425413": 7,
+    "n03445777": 8,
+    "n03888257": 9,
+}
 
 class ViTClassifier(tf.keras.Model):
     def __init__(self, num_classes):
@@ -17,6 +41,9 @@ class ViTClassifier(tf.keras.Model):
         self.backbone.trainable = False
         # Classification head
         self.classifier = tf.keras.layers.Dense(num_classes, name="classifier")
+        # Metrics trackers
+        self.loss_tracker = tf.keras.metrics.Mean(name="loss")
+        self.accuracy_tracker = tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")
 
     def call(self, inputs, training=False):
         # Forward through backbone, get last hidden state
@@ -29,14 +56,31 @@ class ViTClassifier(tf.keras.Model):
         images, labels = data
         with tf.GradientTape() as tape:
             logits = self(images, training=True)
-            # Compute the classification loss and include any regularization losses
-            loss = self.loss(labels, logits) + sum(self.losses)
-        # Compute gradients only for the classifier head
+            # Use the loss function passed during compile for flexibility
+            loss = self.loss(labels, logits)
         grads = tape.gradient(loss, self.classifier.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.classifier.trainable_variables))
-        # Update metrics manually
-        self.compiled_metrics.update_state(labels, logits)
-        return {m.name: m.result() for m in self.metrics}
+        # Update our metrics
+        self.loss_tracker.update_state(loss)
+        self.accuracy_tracker.update_state(labels, logits)
+        return {"loss": self.loss_tracker.result(), "accuracy": self.accuracy_tracker.result()}
+
+    def test_step(self, data):
+        images, labels = data
+        # Forward pass
+        logits = self(images, training=False)
+        # Compute loss
+        loss = self.loss(labels, logits)
+        # Update metrics
+        self.loss_tracker.update_state(loss)
+        self.accuracy_tracker.update_state(labels, logits)
+        # Return a dict of metric results
+        return {"loss": self.loss_tracker.result(), "accuracy": self.accuracy_tracker.result()}
+
+    @property
+    def metrics(self):
+        # Return our custom metrics for reset at each epoch
+        return [self.loss_tracker, self.accuracy_tracker]
 
 
 def mobilenet_factory():
@@ -61,28 +105,19 @@ def mobilenet_factory():
 
 def train_vit():
     """
-    This is just a start. Let me cook.
+    This train_accuracy < val_accuracy and train_loss > val_loss is due to the regularization applied in the training process, such as drop out.
+    This hurts the training accuracy but improves robustness and generalisation, which is the reason why the validation process, without regularization
+    has better accuracy and lower loss. 
     Epoch 1/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 248s 597ms/step - accuracy: 0.5509 - loss: 0.0017 - val_accuracy: 0.9820 - val_loss: 0.9249
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 250s 605ms/step - train_accuracy: 0.5267 - train_loss: 1.9424 - val_val_accuracy: 0.9740 - val_val_loss: 0.9560
     Epoch 2/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9832 - loss: -0.0328 - val_accuracy: 0.9880 - val_loss: 0.4244
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 234s 579ms/step - train_accuracy: 0.9833 - train_loss: 0.7728 - val_val_accuracy: 0.9880 - val_val_loss: 0.4423
     Epoch 3/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9905 - loss: -0.0547 - val_accuracy: 0.9880 - val_loss: 0.2543
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 231s 573ms/step - train_accuracy: 0.9907 - train_loss: 0.3700 - val_val_accuracy: 0.9920 - val_val_loss: 0.2662
     Epoch 4/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 558ms/step - accuracy: 0.9920 - loss: -0.0689 - val_accuracy: 0.9880 - val_loss: 0.1787
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 228s 565ms/step - train_accuracy: 0.9931 - train_loss: 0.2268 - val_val_accuracy: 0.9920 - val_val_loss: 0.1874
     Epoch 5/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 560ms/step - accuracy: 0.9929 - loss: -0.0789 - val_accuracy: 0.9880 - val_loss: 0.1376
-
-    Epoch 1/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 241s 581ms/step - accuracy: 0.5809 - loss: -0.0102 - val_accuracy: 0.9740 - val_loss: 0.9154
-    Epoch 2/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9847 - loss: -0.0415 - val_accuracy: 0.9800 - val_loss: 0.4250
-    Epoch 3/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 559ms/step - accuracy: 0.9908 - loss: -0.0611 - val_accuracy: 0.9840 - val_loss: 0.2582
-    Epoch 4/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 559ms/step - accuracy: 0.9917 - loss: -0.0740 - val_accuracy: 0.9840 - val_loss: 0.1834
-    Epoch 5/5
-    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 558ms/step - accuracy: 0.9937 - loss: -0.0835 - val_accuracy: 0.9880 - val_loss: 0.1424
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 232s 574ms/step - train_accuracy: 0.9933 - train_loss: 0.1610 - val_val_accuracy: 0.9920 - val_val_loss: 0.1444
     """
 
     num_classes = len(class_to_idx)
