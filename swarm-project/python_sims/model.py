@@ -1,4 +1,4 @@
-from transformers import TFViTForImageClassification
+from transformers import TFViTModel
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -8,6 +8,35 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from dataset import class_to_idx
+
+class ViTClassifier(tf.keras.Model):
+    def __init__(self, num_classes):
+        super(ViTClassifier, self).__init__()
+        # Load and freeze the TFViT backbone
+        self.backbone = TFViTModel.from_pretrained("google/vit-base-patch16-224-in21k")
+        self.backbone.trainable = False
+        # Classification head
+        self.classifier = tf.keras.layers.Dense(num_classes, name="classifier")
+
+    def call(self, inputs, training=False):
+        # Forward through backbone, get last hidden state
+        outputs = self.backbone(pixel_values=inputs, training=training).last_hidden_state
+        # Take the [CLS] token (first token)
+        cls_token = outputs[:, 0, :]
+        return self.classifier(cls_token)
+
+    def train_step(self, data):
+        images, labels = data
+        with tf.GradientTape() as tape:
+            logits = self(images, training=True)
+            # Compute the classification loss and include any regularization losses
+            loss = self.loss(labels, logits) + sum(self.losses)
+        # Compute gradients only for the classifier head
+        grads = tape.gradient(loss, self.classifier.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.classifier.trainable_variables))
+        # Update metrics manually
+        self.compiled_metrics.update_state(labels, logits)
+        return {m.name: m.result() for m in self.metrics}
 
 
 def mobilenet_factory():
@@ -30,45 +59,34 @@ def mobilenet_factory():
     return model
 
 
-def vit_factory():
-    """
-    Constructs a TensorFlow Keras model with a frozen JAX/Flax ViT backbone
-    and a trainable classification head.
-    """
-    num_classes = len(class_to_idx)
-    model = TFViTForImageClassification.from_pretrained(
-        "google/vit-base-patch16-224-in21k", num_labels=num_classes
-    )
-    # Freeze the ViT backbone
-    model.vit.trainable = False
-
-    return model
-
-
 def train_vit():
     """
     This is just a start. Let me cook.
     Epoch 1/5
-    WARNING:tensorflow:AutoGraph could not transform <function infer_framework at 0x106fc7250> and will run it as-is.
-    Cause: for/else statement not yet supported
-    To silence this warning, decorate the function with @tf.autograph.experimental.do_not_convert
-    WARNING:tensorflow:AutoGraph could not transform <function infer_framework at 0x106fc7250> and will run it as-is.
-    Cause: for/else statement not yet supported
-    To silence this warning, decorate the function with @tf.autograph.experimental.do_not_convert
-    2025-06-20 11:49:45.566683: I tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.cc:117] Plugin optimizer for device_type GPU is enabled.
-    403/403 [==============================] - 259s 593ms/step - loss: 7.6420 - accuracy: 0.1294 - val_loss: 7.5613 - val_accuracy: 0.1720
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 248s 597ms/step - accuracy: 0.5509 - loss: 0.0017 - val_accuracy: 0.9820 - val_loss: 0.9249
     Epoch 2/5
-    403/403 [==============================] - 227s 561ms/step - loss: 7.6205 - accuracy: 0.1288 - val_loss: 7.5613 - val_accuracy: 0.1720
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9832 - loss: -0.0328 - val_accuracy: 0.9880 - val_loss: 0.4244
     Epoch 3/5
-    403/403 [==============================] - 222s 551ms/step - loss: 7.6644 - accuracy: 0.1347 - val_loss: 7.5613 - val_accuracy: 0.1720
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9905 - loss: -0.0547 - val_accuracy: 0.9880 - val_loss: 0.2543
     Epoch 4/5
-    403/403 [==============================] - 224s 556ms/step - loss: 7.6381 - accuracy: 0.1307 - val_loss: 7.5613 - val_accuracy: 0.1720
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 558ms/step - accuracy: 0.9920 - loss: -0.0689 - val_accuracy: 0.9880 - val_loss: 0.1787
     Epoch 5/5
-    403/403 [==============================] - 224s 555ms/step - loss: 7.6821 - accuracy: 0.1339 - val_loss: 7.5613 - val_accuracy: 0.1720
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 560ms/step - accuracy: 0.9929 - loss: -0.0789 - val_accuracy: 0.9880 - val_loss: 0.1376
+
+    Epoch 1/5
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 241s 581ms/step - accuracy: 0.5809 - loss: -0.0102 - val_accuracy: 0.9740 - val_loss: 0.9154
+    Epoch 2/5
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 226s 559ms/step - accuracy: 0.9847 - loss: -0.0415 - val_accuracy: 0.9800 - val_loss: 0.4250
+    Epoch 3/5
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 559ms/step - accuracy: 0.9908 - loss: -0.0611 - val_accuracy: 0.9840 - val_loss: 0.2582
+    Epoch 4/5
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 559ms/step - accuracy: 0.9917 - loss: -0.0740 - val_accuracy: 0.9840 - val_loss: 0.1834
+    Epoch 5/5
+    403/403 ━━━━━━━━━━━━━━━━━━━━ 225s 558ms/step - accuracy: 0.9937 - loss: -0.0835 - val_accuracy: 0.9880 - val_loss: 0.1424
     """
 
-    # Build the model
-    model = vit_factory()
+    num_classes = len(class_to_idx)
+    model = ViTClassifier(num_classes)
 
     # Load datasets
     ds_train, ds_info = tfds.load(
@@ -76,48 +94,35 @@ def train_vit():
     )
     ds_val = tfds.load("imagenette/160px", split="validation", as_supervised=True)
 
-    # Preprocessing and augmentation
     def preprocess(image, label):
-        # Resize to the ViT’s expected input size
+        # Resize and normalize for ViT
         image = tf.image.resize(image, (224, 224))
-        # Rescale to [0,1]
         image = tf.cast(image, tf.float32) / 255.0
-        # Normalize with mean and std (as in ViT image processing)
         mean = tf.constant([0.5, 0.5, 0.5], shape=[1, 1, 3], dtype=tf.float32)
         std = tf.constant([0.5, 0.5, 0.5], shape=[1, 1, 3], dtype=tf.float32)
         image = (image - mean) / std
-        # Convert to channels-first for TFViT
-        image = tf.transpose(image, perm=[2, 0, 1])
-        return image, label
-
-    def augment(image, label):
-        image = tf.image.random_flip_left_right(image)
-        image = tf.image.random_brightness(image, 0.2)
+        image = tf.transpose(image, perm=[2, 0, 1])  # Change to [C, H, W] format
         return image, label
 
     ds_train = (
-        ds_train.map(preprocess)
-        .map(augment)
+        ds_train
+        .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
         .shuffle(1000)
         .batch(32)
         .prefetch(tf.data.AUTOTUNE)
     )
-    ds_val = ds_val.map(preprocess).batch(32).prefetch(tf.data.AUTOTUNE)
-
-    # Initial training of only the new head
-    # Freeze backbone, leave classifier head trainable
-    model.trainable = False
-    model.classifier.trainable = True
+    ds_val = (
+        ds_val
+        .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+        .batch(32)
+        .prefetch(tf.data.AUTOTUNE)
+    )
 
     model.compile(
-        optimizer="adam",
-        loss=SparseCategoricalCrossentropy(from_logits=False),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+        loss=SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
-    # callbacks = [
-    #     EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True),
-    #     ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1, min_lr=1e-6)
-    # ]
     model.fit(ds_train, validation_data=ds_val, epochs=5)
 
 
