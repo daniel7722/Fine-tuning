@@ -7,7 +7,7 @@ export PATH=/vol/bitbucket/${USER}/tiny/bin/:$PATH
 # if using miniconda, uncomment the below line
 # source ~/.bashrc
 source activate
-source /vol/cuda/12.0.0/setup.sh
+source /vol/cuda/12.4.0/setup.sh
 /usr/bin/nvidia-smi
 uptime
 python3 Fine-tuning/swarm-project/python_sims/model.py
