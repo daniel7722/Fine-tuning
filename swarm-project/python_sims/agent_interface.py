@@ -3,6 +3,9 @@ import numpy as np
 import tensorflow as tf
 
 
+
+
+
 class Agent:
     """
     Agent interface for swarm learning simulation.
@@ -83,27 +86,38 @@ class Agent:
             start += size
         self.model.set_weights(new_weights)
 
-    def train(self, num_batches=None):
+    def train(self, num_batches=None): 
         """
         Perform local training for a given number of batches.
         Updates the model in-place.
         """
+        
         print(f"Agent {self.agent_id} starting local training")
         # Determine how many batches to train; default from config
         num = num_batches or self.config.get("batches_per_round", 2)
         loss = None
         loss_fn = self.loss_fn
+        # if hasattr(self.model, "train_step"):
+        #     self.model.configure_vit(agent_config)
+
         for step in range(num):
-            imgs, targets = next(self.data_loader)
+            imgs, labels = next(self.data_loader) 
+            if hasattr(self.model, "train_step"):
+                print(f"Agent {self.agent_id} using custom train_step")
+                
+                logs = self.model.train_step((imgs, labels))
+                loss = logs.get("loss")
 
-            with tf.GradientTape() as tape:
-                logits = self.model(imgs, training=True)
-                loss = loss_fn(targets, logits)
-            grads = tape.gradient(loss, self.model.trainable_weights)
-            self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
+            else: 
 
-            if step % self.config.get("log_interval", 1) == 0:
-                print(f"Agent {self.agent_id} - Loss: {loss.numpy()}")
+                with tf.GradientTape() as tape:
+                    logits = self.model(imgs, training=True)
+                    loss = loss_fn(labels, logits)
+                grads = tape.gradient(loss, self.model.trainable_weights)
+                self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
+
+                if step % self.config.get("log_interval", 1) == 0:
+                    print(f"Agent {self.agent_id} - Loss: {loss.numpy()}")
 
         return loss
 
@@ -167,12 +181,20 @@ class Agent:
         """
         print(f"Agent {self.agent_id} evaluating model on validation set")
         # Run inference on validation_loader and compute metrics
+        for m in self.model.metrics: 
+            m.reset_state()
         total_loss = 0.0
         num_samples = 0
         loss_fn = self.loss_fn
         for imgs, targets in validation_loader:
-            logits = self.model(imgs, training=False)
-            loss = loss_fn(targets, logits)
+            if hasattr(self.model, "train_step"):
+                print(f"Agent {self.agent_id} using custom test_step")
+
+                logs = self.model.test_step((imgs, targets))
+                loss = logs.get("loss")
+            else:
+                logits = self.model(imgs, training=False)
+                loss = loss_fn(targets, logits)
             total_loss += loss.numpy() * imgs.shape[0]
             num_samples += imgs.shape[0]
         avg_loss = total_loss / num_samples if num_samples > 0 else 0.0

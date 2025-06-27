@@ -25,9 +25,10 @@ def load_and_preprocess(image_path):
     """
     image_data = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image_data, channels=3)
-    image = tf.image.resize(image, (160, 160))
+    image = tf.image.resize(image, (224, 224))
     image = tf.cast(image, tf.float32)
     image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
+    # print(image.shape)
     return image.numpy()
 
 

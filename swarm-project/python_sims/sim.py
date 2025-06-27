@@ -4,8 +4,8 @@ import csv
 import threading
 import yaml
 from agent_interface import Agent
-from dataset import data_loader_for, get_validation_set
-from model import mobilenet_factory
+from dataset import data_loader_for, get_validation_set, class_to_idx
+from model import mobilenet_factory, vit_factory
 
 # Load configs
 with open("configs/sim_config.yaml") as f:
@@ -18,12 +18,15 @@ gbest_weights = None
 gbest_loss = float("inf")
 gbest_lock = threading.Lock()
 
-# Prepare global validation set
+# Prepare global validation set 
 validation_batches = list(get_validation_set())
 
 barrier = threading.Barrier(sim_config.get("num_agents", 1))
 agents = [
-    Agent(i, data_loader_for(i), mobilenet_factory, agent_config)
+    Agent(i, data_loader_for(i),
+        #   mobilenet_factory,
+          vit_factory, 
+          agent_config)
     for i in range(sim_config["num_agents"])
 ]
 

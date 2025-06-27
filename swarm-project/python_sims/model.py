@@ -1,3 +1,5 @@
+import yaml
+
 from transformers import TFViTModel
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -7,6 +9,9 @@ from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
+
+with open("configs/agent_config.yaml") as f:
+    agent_config = yaml.safe_load(f)
 
 class_names = [
     "n01440764",
@@ -44,6 +49,14 @@ class ViTClassifier(tf.keras.Model):
         # Metrics trackers
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
         self.accuracy_tracker = tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")
+        _ = self(tf.zeros((1, 3, 224, 224)), training=False)
+
+    def configure_vit(self, config):
+        self.compile(
+            optimizer=tf.keras.optimizers.get(config["optimizer"]),
+            loss=tf.keras.losses.get(config["loss_fn"]),
+            metrics=[tf.keras.metrics.get(m) for m in config.get("metrics", [])]
+        )
 
     def call(self, inputs, training=False):
         # Forward through backbone, get last hidden state
@@ -52,8 +65,11 @@ class ViTClassifier(tf.keras.Model):
         cls_token = outputs[:, 0, :]
         return self.classifier(cls_token)
 
+    @tf.function
     def train_step(self, data):
         images, labels = data
+        if images.shape[-1] == 3:
+            images = tf.transpose(images, [0, 3, 1, 2])
         with tf.GradientTape() as tape:
             logits = self(images, training=True)
             # Use the loss function passed during compile for flexibility
@@ -65,8 +81,11 @@ class ViTClassifier(tf.keras.Model):
         self.accuracy_tracker.update_state(labels, logits)
         return {"loss": self.loss_tracker.result(), "accuracy": self.accuracy_tracker.result()}
 
+    @tf.function
     def test_step(self, data):
         images, labels = data
+        if images.shape[-1] == 3:
+            images = tf.transpose(images, [0, 3, 1, 2])
         # Forward pass
         logits = self(images, training=False)
         # Compute loss
@@ -81,6 +100,15 @@ class ViTClassifier(tf.keras.Model):
     def metrics(self):
         # Return our custom metrics for reset at each epoch
         return [self.loss_tracker, self.accuracy_tracker]
+    
+def vit_factory():
+    """
+    Constructs a ViT-based classification model for the number of classes
+    defined in dataset.class_to_idx.
+    """
+    m = ViTClassifier(len(class_to_idx))
+    m.configure_vit(agent_config)
+    return m
 
 
 def mobilenet_factory():
@@ -243,11 +271,11 @@ def train_mobilenet():
 
 
 def main():
+    print("GPUs:", tf.config.list_physical_devices("GPU"))
     # Uncomment the model you want to train
     # train_mobilenet()
     train_vit()
 
 
 if __name__ == "__main__":
-    print("GPUs:", tf.config.list_physical_devices("GPU"))
     main()
