@@ -274,7 +274,7 @@ def main():
     print("GPUs:", tf.config.list_physical_devices("GPU"))
     # Uncomment the model you want to train
     # train_mobilenet()
-    train_vit()
+    # train_vit()
 
 
 if __name__ == "__main__":

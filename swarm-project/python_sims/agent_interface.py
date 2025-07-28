@@ -1,4 +1,5 @@
 import threading
+import time
 import numpy as np
 import tensorflow as tf
 
@@ -97,27 +98,30 @@ class Agent:
         num = num_batches or self.config.get("batches_per_round", 2)
         loss = None
         loss_fn = self.loss_fn
-        # if hasattr(self.model, "train_step"):
-        #     self.model.configure_vit(agent_config)
 
         for step in range(num):
-            imgs, labels = next(self.data_loader) 
+            t0 = time.perf_counter()
+            imgs, labels = next(self.data_loader)
+
             if hasattr(self.model, "train_step"):
-                print(f"Agent {self.agent_id} using custom train_step")
                 
                 logs = self.model.train_step((imgs, labels))
                 loss = logs.get("loss")
 
-            else: 
 
+            else:
                 with tf.GradientTape() as tape:
                     logits = self.model(imgs, training=True)
                     loss = loss_fn(labels, logits)
                 grads = tape.gradient(loss, self.model.trainable_weights)
                 self.optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
-
-                if step % self.config.get("log_interval", 1) == 0:
-                    print(f"Agent {self.agent_id} - Loss: {loss.numpy()}")
+            
+            t_train = time.perf_counter() - t0
+            # if step % self.config.get("log_interval", 1) == 0:
+            #     print(f"Agent {self.agent_id}  - Loss: {loss.numpy()}")
+            print(
+                f"Agent {self.agent_id} -> batch {step + 1}/{num} took {t_train:.4f}s, loss: {loss.numpy()}"
+            )
 
         return loss
 
@@ -188,7 +192,6 @@ class Agent:
         loss_fn = self.loss_fn
         for imgs, targets in validation_loader:
             if hasattr(self.model, "train_step"):
-                print(f"Agent {self.agent_id} using custom test_step")
 
                 logs = self.model.test_step((imgs, targets))
                 loss = logs.get("loss")
