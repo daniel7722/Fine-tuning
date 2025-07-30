@@ -2,7 +2,9 @@ import threading
 import yaml
 import random
 import time
-from agent import Agent
+import json
+from pathlib import Path
+from agent import Agent, VisionAgent, AudioAgent, IRAgent
 from fusion_unit import FusionUnit
 import numpy as np
 
@@ -24,16 +26,24 @@ fusion_unit = FusionUnit(
     num_modalities=NUM_MODALITIES
 )
 
-def get_ground_truth(): 
-    return random.randint(0, NUM_CLASSES - 1)
-
 agents = [
-    Agent(agent_id=i, class_count=NUM_CLASSES)
-    for i in range(NUM_AGENTS)
+    VisionAgent(agent_id=0, class_count=NUM_CLASSES),
+    VisionAgent(agent_id=1, class_count=NUM_CLASSES),
+    VisionAgent(agent_id=2, class_count=NUM_CLASSES),
+    AudioAgent(agent_id=3, class_count=NUM_CLASSES),
+    AudioAgent(agent_id=4, class_count=NUM_CLASSES),
+    AudioAgent(agent_id=5, class_count=NUM_CLASSES),
+    IRAgent(agent_id=6, class_count=NUM_CLASSES),
+    IRAgent(agent_id=7, class_count=NUM_CLASSES),
+    IRAgent(agent_id=8, class_count=NUM_CLASSES),
 ]
 
-for i, agent in enumerate(agents): 
-    agent.modality_id = i % NUM_MODALITIES  # Assign modalities in a round-robin fashion for now
+# Load synthetic dataset
+DATA_PATH = Path("data/synthetic/emergency_data.jsonl")
+with open(DATA_PATH, "r") as f:
+    episodes = [json.loads(line) for line in f]
+
+assert len(episodes) > NUM_ROUNDS, "Not enough data to simulate"
 
 # Fusion thread barrier
 barrier = threading.Barrier(NUM_AGENTS)
@@ -41,13 +51,16 @@ barrier = threading.Barrier(NUM_AGENTS)
 # Shared prediction list for aggregation
 emissions_lock = threading.Lock()
 emissions = []
+correct_count = 0
+emergency_count = 0
 
 def agent_worker(agent): 
     global emissions
-    for round_idx in range(NUM_ROUNDS): 
-        gt = get_ground_truth()
-        out = agent.emit(gt)
-        out["modality_id"] = agent.modality_id  # Add modality ID
+    global correct_count
+    global emergency_count
+    for round_idx in range(NUM_ROUNDS):
+        gt = episodes[round_idx]["label"]
+        out = agent.emit(episodes[round_idx])
         with emissions_lock:
             emissions.append(out)
 
@@ -56,7 +69,17 @@ def agent_worker(agent):
             with emissions_lock:
                 # Aggregate outputs from all agents
                 fused = fusion_unit.call(agent_outputs=emissions)
+                loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
+                
                 print(f"Round {round_idx}, Fused Output: {fused.numpy()}")
+                print(f"Ground Truth: {gt}, Loss: {loss:.4f}")
+                correct_count += int(np.argmax(fused) == gt)
+                if np.argmax(fused) == 1:
+                  emergency_count += 1
+                print(
+                    f"Emergency Percentage: {emergency_count / (round_idx + 1) * 100:.2f}%, "
+                    f"Correct Percentage: {correct_count / (round_idx + 1) * 100:.2f}%"
+                )
                 emissions.clear()
 
         barrier.wait()  # Wait for fusion to complete before next round
