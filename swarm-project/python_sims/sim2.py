@@ -7,6 +7,7 @@ from pathlib import Path
 from agent import Agent, VisionAgent, AudioAgent, IRAgent
 from fusion_unit import FusionUnit
 import numpy as np
+import csv
 
 
 # Load configs
@@ -53,11 +54,18 @@ emissions_lock = threading.Lock()
 emissions = []
 correct_count = 0
 emergency_count = 0
+non_emergency_count = 0
+log_path = Path("logs/2025-07-30")
+log_path.mkdir(parents=True, exist_ok=True)
+log_file = open(log_path / "emergency_sim.csv", "w", newline="")
+csv_writer = csv.writer(log_file)
+csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output"])
 
 def agent_worker(agent): 
     global emissions
     global correct_count
     global emergency_count
+    global non_emergency_count
     for round_idx in range(NUM_ROUNDS):
         gt = episodes[round_idx]["label"]
         out = agent.emit(episodes[round_idx])
@@ -71,15 +79,28 @@ def agent_worker(agent):
                 fused = fusion_unit.call(agent_outputs=emissions)
                 loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
                 
-                print(f"Round {round_idx}, Fused Output: {fused.numpy()}")
+                print(f"Round {round_idx}")
                 print(f"Ground Truth: {gt}, Loss: {loss:.4f}")
                 correct_count += int(np.argmax(fused) == gt)
-                if np.argmax(fused) == 1:
-                  emergency_count += 1
+                if gt == 1:
+                    emergency_count += 1
+                else: 
+                    non_emergency_count += 1
+                  
+                emergency_percentage = emergency_count / (round_idx + 1) * 100
+                correct_percentage = correct_count / (round_idx + 1) * 100
                 print(
-                    f"Emergency Percentage: {emergency_count / (round_idx + 1) * 100:.2f}%, "
-                    f"Correct Percentage: {correct_count / (round_idx + 1) * 100:.2f}%"
+                    f"Emergency Percentage: {emergency_percentage:.2f}%, "
+                    f"Correct Percentage: {correct_percentage:.2f}%"
                 )
+                csv_writer.writerow([
+                    round_idx, 
+                    gt,
+                    f"{emergency_percentage:.2f}%",
+                    f"{correct_percentage:.2f}%",
+                    f"{loss:.4f}",
+                    fused.numpy().tolist()
+                ])
                 emissions.clear()
 
         barrier.wait()  # Wait for fusion to complete before next round
@@ -92,3 +113,4 @@ for agent in agents:
 
 for t in threads:
   t.join()
+log_file.close()

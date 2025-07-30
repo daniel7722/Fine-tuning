@@ -84,7 +84,19 @@ def generate_episode():
 if __name__ == "__main__":
     output_path = Path("data/synthetic/emergency_data.jsonl")
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    emergency_data = []
+    non_emergency_data = []
+    while len(emergency_data) < 5000 or len(non_emergency_data) < 5000: 
+        episode = generate_episode()
+        if episode["label"] == 1:
+            emergency_data.append(episode)
+        else:
+            non_emergency_data.append(episode)
+    # Balance the dataset
+    min_count = min(len(emergency_data), len(non_emergency_data))
+    print("min_count:", min_count)
+    balanced = emergency_data[:min_count] + non_emergency_data[:min_count]
+    random.shuffle(balanced)
     with open(output_path, "w") as f: 
-        for _ in range(10000): 
-            episode = generate_episode()
+        for episode in balanced:
             f.write(json.dumps(episode) + "\n")
