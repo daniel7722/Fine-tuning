@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
+from tensorflow.keras.layers import LayerNormalization, MultiHeadAttention
 
 class FusionUnit(tf.keras.Model):
     def __init__(self, class_count=2, num_agents=4, num_modalities=4, hidden_dim=16, embedding_dim=8):
@@ -12,10 +13,15 @@ class FusionUnit(tf.keras.Model):
         self.modality_embeddings = layers.Embedding(input_dim=num_modalities, output_dim=embedding_dim)
 
         # Attention network
-        self.attention_net = tf.keras.Sequential([
-            layers.Dense(hidden_dim, activation='relu'),
-            layers.Dense(1) # Outputs a scalar attention score
+        self.input_proj = layers.Dense(hidden_dim)
+        self.attn_norm1 = LayerNormalization()
+        self.attn_block = MultiHeadAttention(num_heads=2, key_dim=embedding_dim, dropout=0.1)
+        self.attn_norm2 = LayerNormalization()
+        self.ffn = tf.keras.Sequential([
+            layers.Dense(hidden_dim * 2, activation='relu'), 
+            layers.Dense(hidden_dim)
         ])
+        self.output_layer = layers.Dense(class_count)
         self.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     def call(self, agent_outputs, training=False): 
@@ -36,8 +42,6 @@ class FusionUnit(tf.keras.Model):
             agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
             modality_id = tf.convert_to_tensor(out['modality_id'], dtype=tf.int32)
 
-            agent_vec = self.agent_embeddings(agent_id) # shape [1, embedding_dim]
-            modality_vec = self.modality_embeddings(modality_id) # shape [1, embedding_dim]
             agent_vec = self.agent_embeddings(tf.expand_dims(agent_id, axis=0))
             modality_vec = self.modality_embeddings(tf.expand_dims(modality_id, axis=0))
             identity_vec = tf.concat([agent_vec, modality_vec], axis=-1) # shape [1, 2*embedding_dim]
@@ -46,8 +50,23 @@ class FusionUnit(tf.keras.Model):
             x.append(combined)
 
         x = tf.stack(x, axis=0) # shape [num_agents, class_count + 1 + 2*embedding_dim]
-        attn_scores = self.attention_net(x)
-        attn_weights = tf.nn.softmax(attn_scores, axis=0)
+        x = tf.expand_dims(x, axis=0)  # [1, num_agents, features]
+
+        # Project to hidden_dim first
+        x_proj = self.input_proj(x)
+
+        # Attention Block (self-attention)
+        attn_out = self.attn_block(query=x_proj, key=x_proj, value=x_proj)
+        attn_out = self.attn_norm1(attn_out + x_proj)  # Residual connection + norm
+
+        # Feed-forward network
+        ffn_out = self.ffn(attn_out)
+        ffn_out = self.attn_norm2(ffn_out + attn_out)  # Residual connection + norm
+
+        ffn_out = tf.squeeze(ffn_out, axis=0)  # [num_agents, hidden_dim]
+
+        attn_logits = self.output_layer(ffn_out)
+        attn_weights = tf.nn.softmax(attn_logits, axis=0)
 
         beliefs = tf.stack([tf.convert_to_tensor(out['belief'], dtype=tf.float32) for out in agent_outputs])
         weighted_belief = tf.reduce_sum(attn_weights * beliefs, axis=0)
@@ -55,39 +74,14 @@ class FusionUnit(tf.keras.Model):
         self.last_logits = weighted_belief
         return fused_output
     
-    def train_on_single_example(self, agent_outputs, true_label):        
-        """
-        Run a training step on a single example using the provided agent_outputs and ground truth label.
-        """
-
-        with tf.GradientTape() as tape: 
-            x = []
-            for out in agent_outputs:             
-                belief = tf.convert_to_tensor(out['belief'], dtype=tf.float32)
-                trust = tf.convert_to_tensor([out['trust']], dtype=tf.float32)
-                agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
-                modality_id = tf.convert_to_tensor(out['modality_id'], dtype=tf.int32)
-                true_label_tensor = tf.convert_to_tensor([true_label], dtype=tf.int32)
-
-                agent_vec = self.agent_embeddings(tf.expand_dims(agent_id, axis=0))
-                modality_vec = self.modality_embeddings(tf.expand_dims(modality_id, axis=0))
-                identity_vec = tf.concat([agent_vec, modality_vec], axis=-1) # shape [1, 2*embedding_dim]
-                identity_vec = tf.reshape(identity_vec, [-1])
-                combined = tf.concat([belief, trust, identity_vec], axis=0)
-                x.append(combined)
-
-            x = tf.stack(x, axis=0)
-            attn_scores = self.attention_net(x)
-            attn_weights = tf.nn.softmax(attn_scores, axis=0)
-            beliefs = tf.stack([tf.convert_to_tensor(out['belief'], dtype=tf.float32) for out in agent_outputs])
-            weighted_belief = tf.reduce_sum(attn_weights * beliefs, axis=0)
-            logits = weighted_belief
-            print(f"Logits: {logits.numpy()}, Softmax: {tf.nn.softmax(logits).numpy()}")
-
-            loss = tf.keras.losses.sparse_categorical_crossentropy(true_label_tensor, logits, from_logits=True)
+    def train_on_single_example(self, agent_outputs, true_label):
+        with tf.GradientTape() as tape:
+            fused_output = self.call(agent_outputs, training=True)
+            true_label_tensor = tf.convert_to_tensor([true_label], dtype=tf.int32)
+            loss = tf.keras.losses.sparse_categorical_crossentropy(true_label_tensor, self.last_logits, from_logits=True)
 
         grads = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-        return loss
+        return loss.numpy().item()
 
     

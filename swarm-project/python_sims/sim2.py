@@ -44,7 +44,7 @@ DATA_PATH = Path("data/synthetic/emergency_data.jsonl")
 with open(DATA_PATH, "r") as f:
     episodes = [json.loads(line) for line in f]
 
-assert len(episodes) > NUM_ROUNDS, "Not enough data to simulate"
+assert len(episodes) >= NUM_ROUNDS, "Not enough data to simulate"
 
 # Fusion thread barrier
 barrier = threading.Barrier(NUM_AGENTS)
@@ -57,7 +57,7 @@ emergency_count = 0
 non_emergency_count = 0
 log_path = Path("logs/2025-07-30")
 log_path.mkdir(parents=True, exist_ok=True)
-log_file = open(log_path / "emergency_sim.csv", "w", newline="")
+log_file = open(log_path / "emergency_sim_attention.csv", "w", newline="")
 csv_writer = csv.writer(log_file)
 csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output"])
 
