@@ -25,7 +25,8 @@ class FusionUnit(tf.keras.Model):
         ])
         self.output_layer = layers.Dense(class_count)
         optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0) # Clip gradients to prevent exploding gradients
-        self.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.05)
+        self.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
     def call(self, agent_outputs, training=False): 
         """
@@ -40,7 +41,7 @@ class FusionUnit(tf.keras.Model):
         x = []
         for out in agent_outputs:             
             belief = tf.convert_to_tensor(out['belief'], dtype=tf.float32)
-            trust = tf.convert_to_tensor([out['trust']], dtype=tf.float32)
+            # trust = tf.convert_to_tensor([out['trust']], dtype=tf.float32)
             # Embed identity
             agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
             modality_id = tf.convert_to_tensor(out['modality_id'], dtype=tf.int32)
@@ -49,7 +50,11 @@ class FusionUnit(tf.keras.Model):
             modality_vec = self.modality_embeddings(tf.expand_dims(modality_id, axis=0))
             identity_vec = tf.concat([agent_vec, modality_vec], axis=-1) # shape [1, 2*embedding_dim]
             identity_vec = tf.reshape(identity_vec, [-1]) # shape [2*embedding_dim]
-            combined = tf.concat([belief, trust, identity_vec], axis=0)
+            combined = tf.concat([
+                belief, 
+                # trust, 
+                identity_vec
+            ], axis=0)
             x.append(combined)
 
         x = tf.stack(x, axis=0) # shape [num_agents, 2 (belief vector) + 1 (trust) + 2*embedding_dim]
@@ -70,7 +75,11 @@ class FusionUnit(tf.keras.Model):
 
         attn_logits = self.output_layer(ffn_out) # [num_agents, class_count]
         agent_weights = tf.nn.softmax(layers.Dense(1)(ffn_out), axis=0)
-        aggregated_logits = tf.reduce_mean(attn_logits * agent_weights, axis=0)  # [class_count]
+        # aggregated_logits = tf.reduce_mean(attn_logits * agent_weights, axis=0)  # [class_count]
+        trusts = tf.convert_to_tensor([out['trust'] for out in agent_outputs], dtype=tf.float32)
+        trusts = tf.expand_dims(trusts, axis=-1)
+        trust_logits = attn_logits * trusts
+        aggregated_logits = tf.reduce_sum(agent_weights * trust_logits, axis=0)
 
         self.last_logits = aggregated_logits
         fused_output = tf.nn.softmax(aggregated_logits)
