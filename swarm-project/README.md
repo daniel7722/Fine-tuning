@@ -79,3 +79,90 @@ However, several issues remain:
 - There's no historical agent performance tracking integrated into the model yet. 
 
 Next step: rebalance the dataset or apply weighted loss, and track agent-specidfic performance to guide attention weights. 
+
+## 07-31    
+###
+
+Step 1: Attention-Only Fusion Unit
+
+What we implemented:
+	•	Introduced an AttentionBlock to fuse softmax belief vectors from 9 heterogeneous agents.
+	•	Input: [belief vector] + [modality type] + [agent ID].
+
+Observation:
+	•	Accuracy improved to ~86–90%.
+	•	However, loss remained noisy, often spiking to 2–3 when wrong predictions were made.
+	•	No discernible long-term decrease in loss; many outliers persisted.
+	•	The model learned to combine agent inputs, but lacked sufficient generalisation.
+
+Limitation:
+	•	No regularization.
+	•	Attention weights may have overfit to modality-specific or ID-specific patterns.
+	•	No pooling mechanism → risk of overfitting to position or noisy agents.
+
+Next step motivation:
+Add pooling to promote feature abstraction and regularisation.
+
+⸻
+
+✅ Step 2: Attention + Global Average Pooling
+
+What we implemented:
+	•	Added GlobalAveragePooling1D after the attention output.
+	•	Reduced sequence into a single feature vector before the classifier.
+
+Observation:
+	•	Loss dropped more steadily early on.
+	•	Accuracy stayed around 86–90%, similar to the previous setup.
+	•	Still observed spiky loss behavior when the model got confident but wrong.
+	•	Pooling improved convergence smoothness but didn’t drastically improve final accuracy.
+
+Limitation:
+	•	Fusion model now more compact, but still relied on hard labels and suffered from overconfidence.
+
+Next step motivation:
+Introduce label smoothing to regularize output confidence.
+
+⸻
+
+✅ Step 3: Attention + Pooling + Trust Embedding + Label Smoothing
+
+What we implemented:
+	•	Switched loss function from SparseCategoricalCrossentropy to the label-smoothed version.
+	•	Included trust score as an additional feature in the agent input embedding.
+	•	Full input: [belief vector] + [modality type] + [agent ID] + [EMA trust score].
+	•	Encouraged soft, probabilistic outputs rather than overconfident one-hot predictions.
+
+Observation:
+	•	Loss exhibited much smoother decay with fewer spikes.
+	•	Accuracy climbed gradually to ~89–90%.
+	•	Softmax outputs became less peaky, improving model generalisation.
+	•	Better behavior under uncertainty — fewer “hard wrongs.”
+	•	Incorporating trust as an input feature allowed the model to learn context-dependent weighting of agent reliability.
+
+Limitation:
+	•	Loss is still noisy.
+
+Next step motivation:
+Incorporate trust weighting to prioritize reliable agents during fusion.
+
+⸻
+
+✅ Step 4: Attention + Pooling + Label Smoothing + Multiplicative Trust Weighting
+
+What we implemented:
+	•	Instead of embedding trust score into input space, they are used as multiplicative weights on attention logits before softmax.
+	•	Goal: Boost trustworthy agents, suppress unreliable ones.
+
+Observation:
+	•	Accuracy plateaued slightly lower (~88–89%) than embedding-based trust version.
+	•	Loss became messier, with no obvious advantage over embedding trust scores.
+	•	Trust weighting did not improve the model’s ability to resolve noisy inputs.
+	•	Overall, marginal gains compared to cost in complexity.
+
+Insight:
+	•	Trust score might not correlate strongly with agent usefulness at a per-sample level.
+	•	Embedding trust directly into the feature vector worked better, likely because it allowed the model to learn non-linear interactions between trust, modality, and belief vector.
+
+Next step motivation:
+Reassess trust strategy — perhaps combine dynamic agent masking, context-aware trust updates, or confidence calibration instead of hard multiplicative gating.
