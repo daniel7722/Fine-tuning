@@ -8,17 +8,8 @@ class Agent(ABC):
 		self.agent_id = agent_id
 		self.class_count = class_count
 		self.ema_alpha = ema_alpha
-		self.trust_score = 1.0 # Start with full trust
-		self.last_correct = True # Initial assumption
 		self.noise_level = random.uniform(0.0, 0.5) # Simulate sensor quality
-  
-	def update_trust(self, predicted_class, ground_truth): 
-		"""
-		Updates trust score based on prediction correctness using EMA.
-		"""
-		correct = (predicted_class == ground_truth)
-		self.last_correct = correct
-		self.trust_score = self.ema_alpha * float(correct) + (1 - self.ema_alpha) * self.trust_score
+
 
 	@abstractmethod
 	def emit(self, episode):
@@ -52,7 +43,6 @@ class VisionAgent(Agent):
 		return {
 			"agent_id": self.agent_id,
 			"belief": belief,
-			"trust": self.trust_score,
 			"prediction": np.argmax(belief),
 			"correct": (np.argmax(belief) == episode["label"]),
 			"modality_id": self.modality_id
@@ -81,7 +71,6 @@ class AudioAgent(Agent):
 		return {
 			"agent_id": self.agent_id,
 			"belief": [1 - emergency, emergency],
-			"trust": self.trust_score,
 			"prediction": np.argmax([1 - emergency, emergency]),
 			"correct": (np.argmax([1 - emergency, emergency]) == episode["label"]),
 			"modality_id": self.modality_id
@@ -110,7 +99,6 @@ class IRAgent(Agent):
 		return {
 			"agent_id": self.agent_id,
 			"belief": [1 - emergency, emergency],
-			"trust": self.trust_score,
 			"prediction": np.argmax([1 - emergency, emergency]),
 			"correct": (np.argmax([1 - emergency, emergency]) == episode["label"]),
 			"modality_id": self.modality_id

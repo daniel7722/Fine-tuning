@@ -8,6 +8,7 @@ class FusionUnit(tf.keras.Model):
         self.class_count = class_count
         self.embedding_dim = embedding_dim # Dimension for agent and modality embeddings
         # hidden_dim: Dimension for the internal latent representation in the attention block
+        self.hedge_weight = tf.Variable(tf.ones([num_agents], dtype=tf.float32), trainable=False)
 
         # Learned embeddings
         self.agent_embeddings = layers.Embedding(input_dim=num_agents, output_dim=embedding_dim)
@@ -32,7 +33,6 @@ class FusionUnit(tf.keras.Model):
         """
         agent_outputs: list of dicts with keys: 
           - 'belief': numpy array or tensor of shape [class_count]
-          - 'trust': float scalar
           - 'agent_id': int (0-based)
           - 'modality_id': int (0-based)
         Returns: 
@@ -41,7 +41,6 @@ class FusionUnit(tf.keras.Model):
         x = []
         for out in agent_outputs:             
             belief = tf.convert_to_tensor(out['belief'], dtype=tf.float32)
-            # trust = tf.convert_to_tensor([out['trust']], dtype=tf.float32)
             # Embed identity
             agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
             modality_id = tf.convert_to_tensor(out['modality_id'], dtype=tf.int32)
@@ -52,7 +51,6 @@ class FusionUnit(tf.keras.Model):
             identity_vec = tf.reshape(identity_vec, [-1]) # shape [2*embedding_dim]
             combined = tf.concat([
                 belief, 
-                # trust, 
                 identity_vec
             ], axis=0)
             x.append(combined)
@@ -75,11 +73,13 @@ class FusionUnit(tf.keras.Model):
 
         attn_logits = self.output_layer(ffn_out) # [num_agents, class_count]
         agent_weights = tf.nn.softmax(layers.Dense(1)(ffn_out), axis=0)
-        # aggregated_logits = tf.reduce_mean(attn_logits * agent_weights, axis=0)  # [class_count]
-        trusts = tf.convert_to_tensor([out['trust'] for out in agent_outputs], dtype=tf.float32)
-        trusts = tf.expand_dims(trusts, axis=-1)
-        trust_logits = attn_logits * trusts
-        aggregated_logits = tf.reduce_sum(agent_weights * trust_logits, axis=0)
+        
+        hedge_weights = self.hedge_weight
+        normalised_hedge = hedge_weights / tf.reduce_sum(hedge_weights)
+        combined_weights = tf.squeeze(agent_weights, axis=-1) * normalised_hedge
+        combined_weights = combined_weights / tf.reduce_sum(combined_weights) # Normalize weights
+        combined_weights = tf.expand_dims(combined_weights, axis=-1)
+        aggregated_logits = tf.reduce_sum(combined_weights * attn_logits, axis=0)
 
         self.last_logits = aggregated_logits
         fused_output = tf.nn.softmax(aggregated_logits)
@@ -94,5 +94,3 @@ class FusionUnit(tf.keras.Model):
         grads = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
         return loss.numpy().item()
-
-    

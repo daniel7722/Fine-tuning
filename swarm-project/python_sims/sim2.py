@@ -7,6 +7,7 @@ from fusion_unit import FusionUnit
 import numpy as np
 import csv
 import argparse
+import tensorflow as tf
 
 def main(filename): 
     # Load configs
@@ -54,7 +55,7 @@ def main(filename):
     log_path.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path / f"emergency_sim_{filename}.csv", "w", newline="")
     csv_writer = csv.writer(log_file)
-    csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output"])
+    csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output", "hedge_weights"])
     emissions = []
     correct_count = 0
     emergency_count = 0
@@ -77,6 +78,15 @@ def main(filename):
                     # Aggregate outputs from all agents
                     fused = fusion_unit.call(agent_outputs=emissions)
                     loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
+
+                    # Update hedge weights based on correctness
+                    for i, out in enumerate(emissions):
+                        pred_i = np.argmax(out['prediction'])
+                        if pred_i != gt: 
+                            new_val = fusion_unit.hedge_weight[i] * 0.9 # Decrease weight for incorrect predictions
+                            fusion_unit.hedge_weight[i].assign(tf.maximum(new_val, 0.001))  # Ensure it doesn't go below a threshold
+
+
                     
                     correct_count += int(np.argmax(fused) == gt)
                     if gt == 1:
@@ -93,13 +103,12 @@ def main(filename):
                         f"{emergency_percentage:.2f}%",
                         f"{correct_percentage:.2f}%",
                         f"{loss:.4f}",
-                        fused.numpy().tolist()
+                        fused.numpy().tolist(),
+                        fusion_unit.hedge_weight.numpy().tolist()
                     ])
                     emissions.clear()
-
+                    
             barrier.wait()  # Wait for fusion to complete before next round
-            agent.update_trust(out["prediction"], gt)
-            barrier.wait()
 
     threads = []
     for agent in agents: 
