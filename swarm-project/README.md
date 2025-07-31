@@ -166,3 +166,51 @@ Insight:
 
 Next step motivation:
 Reassess trust strategy — perhaps combine dynamic agent masking, context-aware trust updates, or confidence calibration instead of hard multiplicative gating.
+
+Step 5: Attention + Label Smoothing + Hedge Attention Fusion
+What we implemented: 
+We replaced both the EMA-based trust score and multiplicative weighting scheme with a pricipled online learning appraoch inspired by the Hedge algorithm. This formulation brings theoretical guarantees under adversarial conditions and is well-suited for dynamically learning to weigh multiple experts. 
+
+Mathematical Formulation
+Let there be N agents indexed by i \in \{1, \dots, N\}, each emitting a belief vector \mathbf{p}_i \in \mathbb{R}^C over C classes.
+
+1. Hedge weight initialization
+
+Each agent starts with an equal exponential weight:
+w_i^{(0)} = 1, \quad \forall i
+
+2. Attention-based fusion
+
+Let \alpha_i^{(t)} be the attention logit score from the attention network at time t. Before softmax, we apply hedge weighting:
+
+\tilde{\alpha}_i^{(t)} = \log w_i^{(t)} + \alpha_i^{(t)}
+\text{Attention weight: } a_i^{(t)} = \frac{\exp(\tilde{\alpha}_i^{(t)})}{\sum_j \exp(\tilde{\alpha}_j^{(t)})}
+
+This biases the softmax attention toward historically better-performing agents.
+
+3. Loss and prediction
+
+The fusion prediction is:
+\hat{\mathbf{y}}^{(t)} = \sum_i a_i^{(t)} \cdot \mathbf{p}_i
+We use label-smoothed cross-entropy loss against the ground truth.
+
+4. Hedge weight update
+
+For each agent i, we measure correctness of its individual prediction:
+\ell_i^{(t)} = \mathbb{1}[ \arg\max \mathbf{p}_i \neq y^{(t)} ]
+Then update hedge weights multiplicatively:
+w_i^{(t+1)} = w_i^{(t)} \cdot \gamma^{\ell_i^{(t)}}
+\quad \text{with } \gamma < 1
+This punishes incorrect predictions while keeping weights normalized.
+
+The reason we use hedge algorithm is because it's a theoritecal proven that minimised regret compared to the best expert in hindsight. Also, unlike EMA, Hedge accumulates error multiplicatively, encouraging long-term reliability. Besides it's not a learnable weights and it naturally downweights noisy or misbehaving agent. 
+
+Emprical Results
+	•	Final accuracy: 87%, slightly lower than trust embedding (89%)
+	•	Loss remained noisy with many large spikes (up to 6-7)
+    •	Performance plateaued earlier, suggesting limited adaptability to dynamically shifting agent reliability. 
+
+Why might it underperform
+	•	The synthtic dataset lacks sufficient heterogeneity or difficulty to differentiate reliable from unreliable agents.
+	•	Hedge is sensiive to binary correctness; it ignores how wrong the prediction was (no graded penalty). 
+    •	Embedding trust into the attention unit allows for nonlinear correlations, which Hedge can't model
