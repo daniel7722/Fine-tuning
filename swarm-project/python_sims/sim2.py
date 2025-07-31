@@ -57,7 +57,7 @@ emergency_count = 0
 non_emergency_count = 0
 log_path = Path("logs/2025-07-30")
 log_path.mkdir(parents=True, exist_ok=True)
-log_file = open(log_path / "emergency_sim_attention.csv", "w", newline="")
+log_file = open(log_path / "emergency_sim_attention_pooling.csv", "w", newline="")
 csv_writer = csv.writer(log_file)
 csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output"])
 
