@@ -80,11 +80,13 @@ def main(filename):
                     loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
 
                     # Update hedge weights based on correctness
-                    for i, out in enumerate(emissions):
+                    for out in emissions:
                         pred_i = np.argmax(out['prediction'])
                         if pred_i != gt: 
-                            new_val = fusion_unit.hedge_weight[i] * 0.9 # Decrease weight for incorrect predictions
-                            fusion_unit.hedge_weight[i].assign(tf.maximum(new_val, 0.001))  # Ensure it doesn't go below a threshold
+                            agent_id = out['agent_id']
+                            agent_i = next(a for a in agents if a.agent_id == agent_id)
+                            new_val = agent_i.hedge_weight * 0.9 # Decrease weight for incorrect predictions
+                            agent_i.hedge_weight.assign(tf.maximum(new_val, 0.001))  # Ensure it doesn't go below a threshold
 
 
                     
@@ -104,7 +106,6 @@ def main(filename):
                         f"{correct_percentage:.2f}%",
                         f"{loss:.4f}",
                         fused.numpy().tolist(),
-                        fusion_unit.hedge_weight.numpy().tolist()
                     ])
                     emissions.clear()
                     

@@ -1,14 +1,14 @@
 import random
 import numpy as np
 from abc import ABC, abstractmethod
+import tensorflow as tf
 
 class Agent(ABC): 
 
 	def __init__(self, agent_id, class_count=2, ema_alpha=0.3): 
 		self.agent_id = agent_id
 		self.class_count = class_count
-		self.ema_alpha = ema_alpha
-		self.noise_level = random.uniform(0.0, 0.5) # Simulate sensor quality
+		self.hedge_weight = tf.Variable(1.0, trainable=False)
 
 
 	@abstractmethod
@@ -45,7 +45,8 @@ class VisionAgent(Agent):
 			"belief": belief,
 			"prediction": np.argmax(belief),
 			"correct": (np.argmax(belief) == episode["label"]),
-			"modality_id": self.modality_id
+			"modality_id": self.modality_id,
+			"hedge_weight": self.hedge_weight.numpy()
 		}
 
 class AudioAgent(Agent): 
@@ -73,7 +74,8 @@ class AudioAgent(Agent):
 			"belief": [1 - emergency, emergency],
 			"prediction": np.argmax([1 - emergency, emergency]),
 			"correct": (np.argmax([1 - emergency, emergency]) == episode["label"]),
-			"modality_id": self.modality_id
+			"modality_id": self.modality_id, 
+			"hedge_weight": self.hedge_weight.numpy()
 		}
 	
 class IRAgent(Agent):
@@ -101,5 +103,6 @@ class IRAgent(Agent):
 			"belief": [1 - emergency, emergency],
 			"prediction": np.argmax([1 - emergency, emergency]),
 			"correct": (np.argmax([1 - emergency, emergency]) == episode["label"]),
-			"modality_id": self.modality_id
+			"modality_id": self.modality_id, 
+			"hedge_weight": self.hedge_weight.numpy()
 		}

@@ -44,6 +44,8 @@ class FusionUnit(tf.keras.Model):
             # Embed identity
             agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
             modality_id = tf.convert_to_tensor(out['modality_id'], dtype=tf.int32)
+            hedge_weight = tf.convert_to_tensor(out["hedge_weight"], dtype=tf.float32)
+            hedge_weight = tf.expand_dims(hedge_weight, axis=0) # shape [1]
 
             agent_vec = self.agent_embeddings(tf.expand_dims(agent_id, axis=0))
             modality_vec = self.modality_embeddings(tf.expand_dims(modality_id, axis=0))
@@ -51,7 +53,8 @@ class FusionUnit(tf.keras.Model):
             identity_vec = tf.reshape(identity_vec, [-1]) # shape [2*embedding_dim]
             combined = tf.concat([
                 belief, 
-                identity_vec
+                identity_vec, 
+                hedge_weight
             ], axis=0)
             x.append(combined)
 
@@ -66,19 +69,24 @@ class FusionUnit(tf.keras.Model):
         attn_out = self.attn_norm1(attn_out + x_proj)  # Residual connection + norm
 
         # Feed-forward network
+        # Encode context-aware representations per agent (after attention)
         ffn_out = self.ffn(attn_out) 
         ffn_out = self.attn_norm2(ffn_out + attn_out)  # Residual connection + norm
 
         ffn_out = tf.squeeze(ffn_out, axis=0)  # [num_agents, hidden_dim] removing batch dimension
 
+        # Predict class logits for each agent independently
         attn_logits = self.output_layer(ffn_out) # [num_agents, class_count]
+        # Assign dynamic weights to each agent's logits
         agent_weights = tf.nn.softmax(layers.Dense(1)(ffn_out), axis=0)
         
-        hedge_weights = self.hedge_weight
-        normalised_hedge = hedge_weights / tf.reduce_sum(hedge_weights)
-        combined_weights = tf.squeeze(agent_weights, axis=-1) * normalised_hedge
-        combined_weights = combined_weights / tf.reduce_sum(combined_weights) # Normalize weights
+        # hedge_weights = self.hedge_weight
+        # normalised_hedge = hedge_weights / tf.reduce_sum(hedge_weights)
+        # combined_weights = tf.squeeze(agent_weights, axis=-1) * normalised_hedge
+        # combined_weights = combined_weights / tf.reduce_sum(combined_weights) # Normalize weights
+        combined_weights = tf.squeeze(agent_weights, axis=-1)
         combined_weights = tf.expand_dims(combined_weights, axis=-1)
+        # Fuse predictions into single system decision
         aggregated_logits = tf.reduce_sum(combined_weights * attn_logits, axis=0)
 
         self.last_logits = aggregated_logits
