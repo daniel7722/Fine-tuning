@@ -215,3 +215,34 @@ Why might it underperform
 	•	Hedge is sensiive to binary correctness; it ignores how wrong the prediction was (no graded penalty). 
     •	Embedding trust into the attention unit allows for nonlinear correlations, which Hedge can't model
 
+✅ Step 6: Attention + Label Smoothing + Hedge Weight Embedding + Adaptive Hedge Update
+
+What we implemented:
+•	Embedded hedge weights (log-scaled) into the agent input representation, rather than using them directly to modify attention logits.
+•	Each agent’s hedge weight is appended to its embedding vector alongside belief, agent ID, and modality ID.
+•	This allows the attention mechanism to learn how to use agent reliability in a non-linear, context-sensitive way.
+•	Introduced adaptive hedge update: weights are updated based on a regret-style penalty that increases if the agent repeatedly fails to predict the correct class.
+
+Hedge Update (Adaptive Regret-Based):
+Let y be the ground-truth label and p_i the belief vector of agent i.
+We compute the per-agent loss as:
+    l_i = -log(p_i[y])  (negative log likelihood of true class)
+Then update weights:
+    w_i ← w_i * γ^l_i     where γ ∈ (0,1)
+
+Observation:
+•	Final accuracy ~89%, comparable to earlier trust embedding methods.
+•	Loss remained noisy despite label smoothing and EMA smoothing in plots.
+•	Slower convergence and more volatility compared to simple attention-only model.
+
+Why it might still help:
+•	Embedding hedge allows richer interactions than simple gating.
+•	Regret-based updates respond to probabilistic errors, not just hard mistakes.
+•	Learns from context even if emissions are unordered due to multi-threading.
+
+Limitation:
+•	Still heavily bottlenecked by synthetic data's lack of diversity and realism.
+•	Performance differences remain marginal across trust schemes due to low task complexity.
+
+Next step motivation:
+Move to a real-world multimodal dataset and richer expert models to test robustness, scalability, and practical gains of adaptive trust fusion.
