@@ -214,3 +214,4 @@ Why might it underperform
 	•	The synthtic dataset lacks sufficient heterogeneity or difficulty to differentiate reliable from unreliable agents.
 	•	Hedge is sensiive to binary correctness; it ignores how wrong the prediction was (no graded penalty). 
     •	Embedding trust into the attention unit allows for nonlinear correlations, which Hedge can't model
+

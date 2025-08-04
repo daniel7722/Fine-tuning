@@ -79,14 +79,28 @@ def main(filename):
                     fused = fusion_unit.call(agent_outputs=emissions)
                     loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
 
+                    eta = 0.5
+                    total_weight = 0.0
+                    new_weights = {}
+
                     # Update hedge weights based on correctness
-                    for out in emissions:
-                        pred_i = np.argmax(out['prediction'])
-                        if pred_i != gt: 
-                            agent_id = out['agent_id']
-                            agent_i = next(a for a in agents if a.agent_id == agent_id)
-                            new_val = agent_i.hedge_weight * 0.9 # Decrease weight for incorrect predictions
-                            agent_i.hedge_weight.assign(tf.maximum(new_val, 0.001))  # Ensure it doesn't go below a threshold
+                    for out in emissions: 
+                        agent_id = out['agent_id']
+                        agent_i = next(a for a in agents if a.agent_id == agent_id)
+                        pred_logits = out['belief']
+                        agent_loss = tf.keras.losses.sparse_categorical_crossentropy(
+                            tf.convert_to_tensor([gt], dtype=tf.int32), 
+                            tf.convert_to_tensor([pred_logits], dtype=tf.float32), 
+                            from_logits=False
+                        ).numpy()[0]
+                        updated_weight = agent_i.hedge_weight * np.exp(-eta * agent_loss)
+                        new_weights[agent_id] = updated_weight
+                        total_weight += updated_weight
+
+                    for agent_id, updated_weight in new_weights.items():
+                        normalised_weight = updated_weight / total_weight
+                        agent_i = next(a for a in agents if a.agent_id == agent_id)
+                        agent_i.hedge_weight.assign(tf.clip_by_value(normalised_weight, 0.001, 1.0))
 
 
                     
