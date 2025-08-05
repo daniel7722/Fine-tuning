@@ -1,13 +1,16 @@
-import threading 
+import threading
 import yaml
-import json
+import orjson as json
 from pathlib import Path
-from agent import VisionAgent, AudioAgent, IRAgent
+from agent import VisionAgent, AudioAgent
 from fusion_unit import FusionUnit
 import numpy as np
 import csv
 import argparse
 import tensorflow as tf
+import random
+import pickle
+
 
 def main(filename): 
     # Load configs
@@ -16,17 +19,20 @@ def main(filename):
     with open("configs/agent_config.yaml") as f:
         agent_config = yaml.safe_load(f)
 
+    # Extract simulation parameters
     NUM_CLASSES = sim_config.get("num_classes", 2)
     NUM_AGENTS = sim_config.get("num_agents", 4)
     NUM_MODALITIES = sim_config.get("num_modalities", 2)
     NUM_ROUNDS = sim_config.get("num_rounds", 20)
 
+    # Create fusion unit
     fusion_unit = FusionUnit(
         class_count=NUM_CLASSES,
         num_agents=NUM_AGENTS,
         num_modalities=NUM_MODALITIES
     )
 
+    # Create agents based on config
     agents = [
         VisionAgent(agent_id=0, class_count=NUM_CLASSES),
         VisionAgent(agent_id=1, class_count=NUM_CLASSES),
@@ -34,45 +40,68 @@ def main(filename):
         AudioAgent(agent_id=3, class_count=NUM_CLASSES),
         AudioAgent(agent_id=4, class_count=NUM_CLASSES),
         AudioAgent(agent_id=5, class_count=NUM_CLASSES),
-        IRAgent(agent_id=6, class_count=NUM_CLASSES),
-        IRAgent(agent_id=7, class_count=NUM_CLASSES),
-        IRAgent(agent_id=8, class_count=NUM_CLASSES),
     ]
 
-    # Load synthetic dataset
-    DATA_PATH = Path("data/synthetic/emergency_data.jsonl")
-    with open(DATA_PATH, "r") as f:
-        episodes = [json.loads(line) for line in f]
 
-    assert len(episodes) >= NUM_ROUNDS, "Not enough data to simulate"
+    # Load preprocessed AVE dataset with pickle caching
+    train_path = Path("./data/AVE_Dataset/processed/train.jsonl")
+    val_path = Path("./data/AVE_Dataset/processed/val.jsonl")
+    test_path = Path("./data/AVE_Dataset/processed/test.jsonl")
+    cache_dir = Path("./data/AVE_Dataset/processed")
+    cache_train = cache_dir / "train.pkl"
+    cache_val = cache_dir / "val.pkl"
+    cache_test = cache_dir / "test.pkl"
 
+    # Function to load or cache JSONL data
+    def load_or_cache_jsonl(jsonl_path, pkl_path):
+        if pkl_path.exists():
+            with open(pkl_path, "rb") as f:
+                return pickle.load(f)
+        else:
+            with open(jsonl_path, "r") as f:
+                data = [json.loads(line) for line in f]
+            with open(pkl_path, "wb") as f:
+                pickle.dump(data, f)
+            return data
+
+    print(f"Loading data (with cache)...")
+    train_data = load_or_cache_jsonl(train_path, cache_train)
+    val_data = load_or_cache_jsonl(val_path, cache_val)
+    test_data = load_or_cache_jsonl(test_path, cache_test)
+    print("Done loading data.")
+    random.shuffle(train_data)
+    
     # Fusion thread barrier
     barrier = threading.Barrier(NUM_AGENTS)
 
     # Shared prediction list for aggregation
     emissions_lock = threading.Lock()
-    log_path = Path("logs/2025-07-31")
-    log_path.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path / f"emergency_sim_{filename}.csv", "w", newline="")
-    csv_writer = csv.writer(log_file)
-    csv_writer.writerow(["round", "ground_truth", "emergency_percentage", "correct_percentage", "loss", "softmax_output", "hedge_weights"])
     emissions = []
     correct_count = 0
-    emergency_count = 0
-    non_emergency_count = 0
+
+    # log file setup
+    log_path = Path("logs/2025-08-05")
+    log_path.mkdir(parents=True, exist_ok=True)
+    log_file = open(log_path / f"AVE_{filename}.csv", "w", newline="")
+    csv_writer = csv.writer(log_file)
+    csv_writer.writerow(["round", "ground_truth", "correct_percentage", "loss", "softmax_output", "hedge_weights"])
+    
 
     def agent_worker(agent):
         nonlocal emissions
         nonlocal correct_count
-        nonlocal emergency_count
-        nonlocal non_emergency_count
-        for round_idx in range(NUM_ROUNDS):
-            gt = episodes[round_idx]["label"]
-            out = agent.emit(episodes[round_idx])
+        for round_idx, data in enumerate(train_data):
+            gt = data["label"]
+            print(f"Round {round_idx + 1}/{NUM_ROUNDS} - Agent {agent.agent_id} processing data")
+            out = agent.emit(data)
+            print(f"Agent {agent.agent_id} done processing data")
             with emissions_lock:
                 emissions.append(out)
 
-            barrier.wait()  # Wait for all agents to emit
+            # Wait for all agents to emit
+            barrier.wait()  
+
+            # Only the first agent will handle fusion and logging
             if agent.agent_id == 0:
                 with emissions_lock:
                     # Aggregate outputs from all agents
@@ -88,11 +117,10 @@ def main(filename):
                         agent_id = out['agent_id']
                         agent_i = next(a for a in agents if a.agent_id == agent_id)
                         pred_logits = out['belief']
-                        agent_loss = tf.keras.losses.sparse_categorical_crossentropy(
-                            tf.convert_to_tensor([gt], dtype=tf.int32), 
-                            tf.convert_to_tensor([pred_logits], dtype=tf.float32), 
-                            from_logits=False
-                        ).numpy()[0]
+                        agent_loss = agent_i.train_step(
+                            x=np.array(pred_logits, dtype=np.float32), 
+                            y=gt
+                        )
                         updated_weight = agent_i.hedge_weight * np.exp(-eta * agent_loss)
                         new_weights[agent_id] = updated_weight
                         total_weight += updated_weight
@@ -105,21 +133,15 @@ def main(filename):
 
                     
                     correct_count += int(np.argmax(fused) == gt)
-                    if gt == 1:
-                        emergency_count += 1
-                    else: 
-                        non_emergency_count += 1
-                    
-                    emergency_percentage = emergency_count / (round_idx + 1) * 100
                     correct_percentage = correct_count / (round_idx + 1) * 100
                     print(f"Round {round_idx}: Loss: {loss:.4f}, Correct: {correct_percentage:.2f}%")
                     csv_writer.writerow([
                         round_idx, 
                         gt,
-                        f"{emergency_percentage:.2f}%",
                         f"{correct_percentage:.2f}%",
                         f"{loss:.4f}",
                         fused.numpy().tolist(),
+                        [float(next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()) for out in emissions]
                     ])
                     emissions.clear()
                     
