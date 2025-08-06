@@ -1,6 +1,6 @@
-num_agents: 6
+num_agents: 2
 num_rounds: 1000
 
 num_classes: 28
-num_modalities: 3
+num_modalities: 2
 
