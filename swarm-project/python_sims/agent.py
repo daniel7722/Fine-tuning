@@ -75,6 +75,7 @@ class VisionAgent(Agent):
 		Pre-train the vision agent on the training data.
 		"""	
 		dataset = self.prepare_vision_dataset(train_data, batch_size)
+		self.model.trainable = False
 		model = tf.keras.Sequential([self.model, self.classifier])
 		model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy"])
 		model.fit(dataset, epochs=epochs, verbose=1)
