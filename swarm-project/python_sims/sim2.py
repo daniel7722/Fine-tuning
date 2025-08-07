@@ -1,10 +1,10 @@
 import threading
-import yaml
 from agent import VisionAgent, AudioAgent
 from fusion_unit import FusionUnit
 import numpy as np
 import argparse
 import tensorflow as tf
+import yaml
 
 from util.sim_load_data import load_data
 from util.sim_pretrain_agent import pre_train_agents
@@ -40,7 +40,7 @@ def main(filename):
     train_data, val_data, test_data = load_data()
    
     # Pre-train only the vision agent for now
-    pre_train_agents([agents[0]], train_data=train_data, val_data=val_data)
+    pre_train_agents(agents, train_data=train_data, val_data=val_data)
 
     # prompt user to continue training
     continue_training = input("Continue training? (y/n): ").strip().lower()
@@ -64,9 +64,13 @@ def main(filename):
     def agent_worker(agent):
         nonlocal emissions
         nonlocal correct_count
-        for round_idx, data in enumerate(train_data):
-            gt = data["label"]
-            out = agent.emit(data)
+        for round_idx, data in enumerate(train_data.take(sim_config.get("max_rounds", 1000))):
+            gt = int(data["label"].numpy()[0])
+            out = agent.emit({
+                "vision_data": data["vision_data"].numpy()[0],
+                "audio_data": data["audio_data"].numpy()[0], 
+                "label": gt
+            })
             with emissions_lock:
                 emissions.append(out)
 
@@ -109,22 +113,29 @@ def main(filename):
                   
                     correct_count += int(np.argmax(fused) == gt)
                     correct_percentage = correct_count / (round_idx + 1) * 100
+                    hedge_weights = [float(
+                            next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
+                        ) for out in emissions]
                     csv_writer.writerow([
                         round_idx,
                         gt,
                         f"{correct_percentage:.2f}%",
                         f"{loss:.4f}",
                         np.argmax(fused),
-                        [float(
-                            next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
-                        ) for out in emissions]
+                        hedge_weights[0], 
+                        hedge_weights[1]
                     ])
                     if round_idx % 100 == 0:
                         print(
-                            f"Round {round_idx}: Loss: {loss:.4f}, Correct: {correct_percentage:.2f}%"
+                            f"""Round {round_idx}: 
+                                Loss: {loss:.4f}, 
+                                Correct: {correct_percentage:.2f}%, 
+                                Hedge Weights: {[float(
+                                next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
+                            ) for out in emissions]}"""
                         )
                     emissions.clear()
-                    
+
             barrier.wait()  # Wait for fusion to complete before next round
 
     threads = []

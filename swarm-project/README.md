@@ -259,4 +259,31 @@ Hence, the next run name "att_2" will be adapting to this situation where we
 - freeze vision model backbone and only train the classifier to avoid overfitting
 - don't pretrain audio model to make it a fully randomised model
 - manually assign hedge weight so I know vision model is always more trusted than audio model
+- freeze the continual improvement as well during sim
 - log fusion loss every 100 rounds
+
+Cool, this run is at least going somewhere. Here's the output:
+``` 
+[]
+Loading data (with cache)...
+Done loading data.
+Data loaded in 344.77 seconds
+Pre-training agents...
+Epoch 1/5
+78/78 ━━━━━━━━━━━━━━━━━━━━ 388s 338ms/step - accuracy: 0.3383 - loss: 2.6270  
+Epoch 2/5
+78/78 ━━━━━━━━━━━━━━━━━━━━ 26s 337ms/step - accuracy: 0.7436 - loss: 0.9275
+Epoch 3/5
+78/78 ━━━━━━━━━━━━━━━━━━━━ 25s 316ms/step - accuracy: 0.8103 - loss: 0.6387
+Epoch 4/5
+78/78 ━━━━━━━━━━━━━━━━━━━━ 24s 303ms/step - accuracy: 0.8579 - loss: 0.4873
+Epoch 5/5
+78/78 ━━━━━━━━━━━━━━━━━━━━ 24s 305ms/step - accuracy: 0.8958 - loss: 0.3693
+Pre-training complete.
+Validating pre-trained agents...
+Agent 0 validation loss: 0.9069
+...
+Round 2400: Loss: 0.0293, Correct: 75.43%
+```
+
+By overcoming overfitting for vision agent, leaving audio agent random, and leverage that with hard-coded hedge weights that always trust vision more, there's accuracy improvement with training data. Although, vision always produce accurate result, the fusion accuracy is at quite low 75%, which is great improvement from random 4% but it is still affected by audio agent, which is expected. But the level of influence has no quantifiable way to explain. That is, fixing hedge weight at 0.95 vs 0.05 will always leave some level of trust towards audio agent, an amount that cannot explained by the difference between fully trusting vision agent, which accuracy is roughly 0.9 but strictly speaking unknown, and 95% trusting. This is still area to dig deeper. The next iteration would likely be improve the audio model so they both be useful, let's 

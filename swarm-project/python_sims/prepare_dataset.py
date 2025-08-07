@@ -1,12 +1,13 @@
 import os
 import csv
-import json
 import cv2
 import librosa
 import numpy as np
 from tqdm import tqdm
 from moviepy import VideoFileClip
 from pathlib import Path
+import tensorflow as tf
+
 
 
 DATA_DIR = "./data/AVE_Dataset/AVE"
@@ -60,7 +61,6 @@ def extract_middle_frame(video_path):
     if ret and frame is not None:
         frame = cv2.resize(frame, VISION_SIZE)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        print(f"Processed video {video_path}: extracted frame at index {mid_frame_idx}")
         return frame.astype(np.uint8)
     else:
         return None
@@ -85,18 +85,27 @@ def extract_audio_features(video_path):
         else:
             pad_width = AUDIO_TIMESTEPS - mel_spec_db.shape[1]
             mel_spec_db = np.pad(mel_spec_db, ((0, 0), (0, pad_width)), mode='constant')
-        print(f"Processed audio for {video_path}: shape {mel_spec_db.T.shape}")
         return mel_spec_db.T.astype(np.float32)
     except Exception as e:
         print(f"Error processing audio for {video_path}: {e}")
         return None
+    
+def serialize_example(video_id, label, vision_data, audio_data): 
+    feature = {
+        "video_id": tf.train.Feature(bytes_list=tf.train.BytesList(value=[video_id.encode('utf-8')])),
+        "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+        "vision_data": tf.train.Feature(float_list=tf.train.FloatList(value=vision_data.flatten())),
+        "audio_data": tf.train.Feature(float_list=tf.train.FloatList(value=audio_data.flatten()))
+    }
+    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example_proto.SerializeToString()
 
 def process_split(split_name):
     split_file = os.path.join(SPLIT_DIR, f"{split_name}.csv")
-    output_path = os.path.join(OUTPUT_DIR, f"{split_name}.jsonl")
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    tfrecord_path = os.path.join(OUTPUT_DIR, f"{split_name}.tfrecord")
 
-    with open(split_file, "r") as f, open(output_path, "w") as out_f:
+    with open(split_file, "r") as f, tf.io.TFRecordWriter(tfrecord_path) as writer:
         reader = csv.DictReader(f)
         for row in tqdm(reader, desc=f"Processing {split_name}"):
             video_id = row["VideoID"]
@@ -115,13 +124,13 @@ def process_split(split_name):
             if vision_frame is None or audio_feat is None:
                 continue
 
-            example = {
-                "video_id": video_id,
-                "label": int(label),
-                "vision_data": vision_frame.tolist(),
-                "audio_data": audio_feat.tolist()
-            }
-            out_f.write(json.dumps(example) + "\n")
+            serialized = serialize_example(
+                video_id=video_id,
+                label=int(label),
+                vision_data=vision_frame,
+                audio_data=audio_feat
+            )
+            writer.write(serialized)
 
 if __name__ == "__main__":
     for split in ["train", "val", "test"]:

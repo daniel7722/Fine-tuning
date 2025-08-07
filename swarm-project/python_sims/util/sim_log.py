@@ -8,7 +8,7 @@ def setup_log_file(filename):
     log_file = open(log_path / f"AVE_{filename}.csv", "w", newline="", encoding="utf-8")
     csv_writer = csv.writer(log_file)
     csv_writer.writerow(
-        ["round", "ground_truth", "correct_percentage", "loss", "prediction", "hedge_weights"]
+        ["round", "ground_truth", "correct_percentage", "loss", "prediction", "agent0hw", "agent1hw"]
     )
 
     return log_file, csv_writer
