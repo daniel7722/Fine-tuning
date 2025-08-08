@@ -286,4 +286,34 @@ Agent 0 validation loss: 0.9069
 Round 2400: Loss: 0.0293, Correct: 75.43%
 ```
 
-By overcoming overfitting for vision agent, leaving audio agent random, and leverage that with hard-coded hedge weights that always trust vision more, there's accuracy improvement with training data. Although, vision always produce accurate result, the fusion accuracy is at quite low 75%, which is great improvement from random 4% but it is still affected by audio agent, which is expected. But the level of influence has no quantifiable way to explain. That is, fixing hedge weight at 0.95 vs 0.05 will always leave some level of trust towards audio agent, an amount that cannot explained by the difference between fully trusting vision agent, which accuracy is roughly 0.9 but strictly speaking unknown, and 95% trusting. This is still area to dig deeper. The next iteration would likely be improve the audio model so they both be useful, let's 
+By overcoming overfitting for vision agent, leaving audio agent random, and leverage that with hard-coded hedge weights that always trust vision more, there's accuracy improvement with training data. Although, vision always produce accurate result, the fusion accuracy is at quite low 75%, which is great improvement from random 4% but it is still affected by audio agent, which is expected. But the level of influence has no quantifiable way to explain. That is, fixing hedge weight at 0.95 vs 0.05 will always leave some level of trust towards audio agent, an amount that cannot explained by the difference between fully trusting vision agent, which accuracy is roughly 0.9 but strictly speaking unknown, and 95% trusting. This is still area to dig deeper.
+
+
+### 08-07 (Agent Pretraining Improvements & Error Fixes)
+- **Audio agent pretraining**:  
+  - Adjusted `AudioAgent` input shape & LSTM handling to prevent `ValueError` from Dense expecting (batch,64) but receiving (batch,time,128).  
+  - Fixed embedding extraction and ensured padded batching shape `[None, 128]`.
+- **Vision agent unchanged**, still using frozen backbone + trainable classifier.
+- **Verified pretraining loop**:  
+  - Both agents now run pretraining without shape errors.  
+  - Audio agent still improves marginally each epoch (slow learning rate, stable).
+- **Threading barrier safety**:  
+  - Added logic to avoid deadlocks when one thread finishes early.  
+  - Made iterator handling safe for `OUT_OF_RANGE` so all threads exit cleanly.
+
+### 08-08 (Full Pretraining + Fusion Unit Run)
+- **Full run with ~2.5k rounds**:  
+  - Pretrained both agents successfully (Vision ~0.83 acc final, Audio slow but improving).  
+  - Ran fusion unit with fixed hedge 0.95 / 0.05.  
+  - Achieved smooth loss curve & steady accuracy climb to ~83% final.  
+  - No premature stop — confirmed earlier “900 rounds” issue was due to dataset iterator limit in config.
+- **Plotted metrics**:  
+  - Loss vs. round: clean downward trend.  
+  - Accuracy vs. round: steady upward climb, no major instability.
+- **Next step planning**:  
+  - Re-enable adaptive hedge update with:  
+    - Small η for stability.  
+    - Clipping & renormalisation.  
+    - Optional temperature scaling in fusion logits.  
+  - Expect loss curve to get noisier due to dynamic weighting.
+  
