@@ -4,3 +4,8 @@ num_rounds: 1000
 num_classes: 28
 num_modalities: 2
 
+hedge:
+  eta: 0.05
+  min_weight: 0.001
+  temperature: 1.0
+  loss: nll
