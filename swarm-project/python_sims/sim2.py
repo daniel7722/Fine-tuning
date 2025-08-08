@@ -64,80 +64,93 @@ def main(filename):
     def agent_worker(agent):
         nonlocal emissions
         nonlocal correct_count
-        for round_idx, data in enumerate(train_data.take(sim_config.get("max_rounds", 1000))):
-            gt = int(data["label"].numpy()[0])
-            out = agent.emit({
-                "vision_data": data["vision_data"].numpy()[0],
-                "audio_data": data["audio_data"].numpy()[0], 
-                "label": gt
-            })
-            with emissions_lock:
-                emissions.append(out)
 
-            # Wait for all agents to emit
-            barrier.wait()
-
-            # Only the first agent will handle fusion and logging
-            if agent.agent_id == 0:
+        def safe_barrier_wait(): 
+            try:
+                barrier.wait()
+                return True
+            except threading.BrokenBarrierError:
+                return False
+            
+        try: 
+            for round_idx, data in enumerate(train_data.take(sim_config.get("max_rounds", 5000))):
+                gt = int(data["label"].numpy())
+                out = agent.emit({
+                    "vision_data": data["vision_data"].numpy(),
+                    "audio_waveform": data["audio_waveform"].numpy(), 
+                    "label": gt
+                })
                 with emissions_lock:
-                    # Aggregate outputs from all agents
-                    fused = fusion_unit.call(agent_outputs=emissions)
-                    loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
+                    emissions.append(out)
 
-                    eta = 0.5
-                    total_weight = 0.0
-                    new_weights = {}
+                # Wait for all agents to emit
+                barrier.wait()
 
-                    # Update hedge weights based on correctness
-                    for out in emissions:
-                        agent_id = out['agent_id']
-                        agent_i = next(a for a in agents if a.agent_id == agent_id)
-                        # agent_loss = agent_i.train_step(
-                        #     event=data,
-                        #     label=gt
-                        # )
-                        if agent_id == 0: 
-                            manual_weight = 0.95
-                        else:
-                            manual_weight = 0.05
-                        
-                        agent_i.hedge_weight.assign(manual_weight)
-                    #     updated_weight = agent_i.hedge_weight * np.exp(-eta * agent_loss)
-                    #     new_weights[agent_id] = updated_weight
-                    #     total_weight += updated_weight
+                # Only the first agent will handle fusion and logging
+                if agent.agent_id == 0:
+                    with emissions_lock:
+                        # Aggregate outputs from all agents
+                        fused = fusion_unit.call(agent_outputs=emissions)
+                        loss = fusion_unit.train_on_single_example(emissions, true_label=gt)
 
-                    # for agent_id, updated_weight in new_weights.items():
-                    #     normalised_weight = updated_weight / total_weight
-                    #     agent_i = next(a for a in agents if a.agent_id == agent_id)
-                    #     agent_i.hedge_weight.assign(tf.clip_by_value(normalised_weight, 0.001, 1.0))
-                  
-                    correct_count += int(np.argmax(fused) == gt)
-                    correct_percentage = correct_count / (round_idx + 1) * 100
-                    hedge_weights = [float(
-                            next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
-                        ) for out in emissions]
-                    csv_writer.writerow([
-                        round_idx,
-                        gt,
-                        f"{correct_percentage:.2f}%",
-                        f"{loss:.4f}",
-                        np.argmax(fused),
-                        hedge_weights[0], 
-                        hedge_weights[1]
-                    ])
-                    if round_idx % 100 == 0:
-                        print(
-                            f"""Round {round_idx}: 
-                                Loss: {loss:.4f}, 
-                                Correct: {correct_percentage:.2f}%, 
-                                Hedge Weights: {[float(
+                        eta = 0.5
+                        total_weight = 0.0
+                        new_weights = {}
+
+                        # Update hedge weights based on correctness
+                        for out in emissions:
+                            agent_id = out['agent_id']
+                            agent_i = next(a for a in agents if a.agent_id == agent_id)
+                            # agent_loss = agent_i.train_step(
+                            #     event=data,
+                            #     label=gt
+                            # )
+                            if agent_id == 0: 
+                                manual_weight = 0.95
+                            else:
+                                manual_weight = 0.05
+                            
+                            agent_i.hedge_weight.assign(manual_weight)
+                        #     updated_weight = agent_i.hedge_weight * np.exp(-eta * agent_loss)
+                        #     new_weights[agent_id] = updated_weight
+                        #     total_weight += updated_weight
+
+                        # for agent_id, updated_weight in new_weights.items():
+                        #     normalised_weight = updated_weight / total_weight
+                        #     agent_i = next(a for a in agents if a.agent_id == agent_id)
+                        #     agent_i.hedge_weight.assign(tf.clip_by_value(normalised_weight, 0.001, 1.0))
+                    
+                        correct_count += int(np.argmax(fused) == gt)
+                        correct_percentage = correct_count / (round_idx + 1) * 100
+                        hedge_weights = [float(
                                 next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
-                            ) for out in emissions]}"""
-                        )
-                    emissions.clear()
-
-            barrier.wait()  # Wait for fusion to complete before next round
-
+                            ) for out in emissions]
+                        csv_writer.writerow([
+                            round_idx,
+                            gt,
+                            f"{correct_percentage:.2f}%",
+                            f"{loss:.4f}",
+                            np.argmax(fused),
+                            hedge_weights[0], 
+                            hedge_weights[1]
+                        ])
+                        if round_idx % 100 == 0:
+                            print(
+                                f"""Round {round_idx}: 
+                                    Loss: {loss:.4f}, 
+                                    Correct: {correct_percentage:.2f}%, 
+                                    Hedge Weights: {[float(
+                                    next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
+                                ) for out in emissions]}"""
+                            )
+                        emissions.clear()
+                if not safe_barrier_wait():
+                    return
+        finally:
+            try: 
+                barrier.abort()
+            except Exception: 
+                pass
     threads = []
     for agent in agents:
         t = threading.Thread(target=agent_worker, args=(agent,))

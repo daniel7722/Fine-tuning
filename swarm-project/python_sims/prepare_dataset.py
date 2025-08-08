@@ -7,6 +7,7 @@ from tqdm import tqdm
 from moviepy import VideoFileClip
 from pathlib import Path
 import tensorflow as tf
+import tensorflow_hub as hub
 
 
 
@@ -14,6 +15,7 @@ DATA_DIR = "./data/AVE_Dataset/AVE"
 SPLIT_DIR = "./data/AVE_Dataset/splits"
 OUTPUT_DIR = "./data/AVE_Dataset/processed"
 VISION_SIZE = (224, 224)
+AUDIOSAMPLE_RATE = 16000
 AUDIO_SAMPLE_RATE = 16000
 AUDIO_FEATURE_DIM = 64
 AUDIO_TIMESTEPS = 100
@@ -65,37 +67,23 @@ def extract_middle_frame(video_path):
     else:
         return None
 
-def extract_audio_features(video_path):
+def extract_audio_waveform(video_path):
     try:
         clip = VideoFileClip(video_path)
-        audio = clip.audio.to_soundarray(fps=AUDIO_SAMPLE_RATE)
-        clip.close()
-        if audio is None:
-            return None
-        if audio.ndim > 1:
-            audio = np.mean(audio, axis=1)  # Convert to mono
-        audio = audio.astype(np.float32)
-        # librosa expects 1D float array
-        mel_spec = librosa.feature.melspectrogram(
-            y=audio, sr=AUDIO_SAMPLE_RATE, n_mels=AUDIO_FEATURE_DIM)
-        mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-        # Pad or truncate to fixed timesteps
-        if mel_spec_db.shape[1] > AUDIO_TIMESTEPS:
-            mel_spec_db = mel_spec_db[:, :AUDIO_TIMESTEPS]
-        else:
-            pad_width = AUDIO_TIMESTEPS - mel_spec_db.shape[1]
-            mel_spec_db = np.pad(mel_spec_db, ((0, 0), (0, pad_width)), mode='constant')
-        return mel_spec_db.T.astype(np.float32)
+        audio_array = clip.audio.to_soundarray(fps=AUDIO_SAMPLE_RATE)
+        audio_mono = np.mean(audio_array, axis=1)
+        waveform = audio_mono[:AUDIO_SAMPLE_RATE * 10]  # Max 10s
+        return waveform.astype(np.float32)
     except Exception as e:
         print(f"Error processing audio for {video_path}: {e}")
         return None
     
-def serialize_example(video_id, label, vision_data, audio_data): 
+def serialize_example(video_id, label, vision_data, audio_waveform): 
     feature = {
         "video_id": tf.train.Feature(bytes_list=tf.train.BytesList(value=[video_id.encode('utf-8')])),
         "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
         "vision_data": tf.train.Feature(float_list=tf.train.FloatList(value=vision_data.flatten())),
-        "audio_data": tf.train.Feature(float_list=tf.train.FloatList(value=audio_data.flatten()))
+        "audio_waveform": tf.train.Feature(float_list=tf.train.FloatList(value=audio_waveform.flatten()))
     }
     example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
     return example_proto.SerializeToString()
@@ -120,7 +108,7 @@ def process_split(split_name):
                 continue
 
             vision_frame = extract_middle_frame(video_path)
-            audio_feat = extract_audio_features(video_path)
+            audio_feat = extract_audio_waveform(video_path)
             if vision_frame is None or audio_feat is None:
                 continue
 
@@ -128,7 +116,7 @@ def process_split(split_name):
                 video_id=video_id,
                 label=int(label),
                 vision_data=vision_frame,
-                audio_data=audio_feat
+                audio_waveform=audio_feat
             )
             writer.write(serialized)
 

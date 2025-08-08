@@ -3,19 +3,15 @@ import numpy as np
 from abc import ABC, abstractmethod
 import tensorflow as tf
 from tensorflow.keras import layers
+import tensorflow_hub as hub
+from util.sim_load_data import extract_vision_dataset, extract_audio_dataset
 
 TIMESTEPS = 100
 FEATURE_DIM = 64
 
-def extract_vision_dataset(data):
-	return data.map(lambda x: (x["vision_data"], x["label"]), num_parallel_calls=tf.data.AUTOTUNE)
-
-def extract_audio_dataset(data):
-	return data.map(lambda x: (x["audio_data"], x["label"]), num_parallel_calls=tf.data.AUTOTUNE)
-
 class Agent(ABC): 
 
-	def __init__(self, agent_id, class_count=2, ema_alpha=0.3): 
+	def __init__(self, agent_id, class_count=2, ema_alpha=0.3):
 		self.agent_id = agent_id
 		self.class_count = class_count
 		self.hedge_weight = tf.Variable(1.0, trainable=False)
@@ -66,21 +62,21 @@ class VisionAgent(Agent):
 			"hedge_weight": self.hedge_weight.numpy(), 
 		}
 
-	def pretrain(self, train_data, epochs=10):
+	def pretrain(self, train_data, epochs=10, batch_size=32):
 		"""
 		Pre-train the vision agent on the training data.
 		"""	
 		self.backbone.trainable = False
-		dataset = extract_vision_dataset(train_data).prefetch(tf.data.AUTOTUNE)
+		dataset = extract_vision_dataset(train_data).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
 		self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy"])
 		callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=2, restore_best_weights=True)
 		self.model.fit(dataset, epochs=epochs, verbose=1, callbacks=[callback])
 
-	def validate_pretraining(self, val_data):
+	def validate_pretraining(self, val_data, batch_size=32):
 		"""
 		Validate the pre-trained vision agent on the validation data.
 		"""
-		dataset = extract_vision_dataset(val_data).prefetch(tf.data.AUTOTUNE)
+		dataset = extract_vision_dataset(val_data).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
 		results = self.model.evaluate(dataset, verbose=1)
 		return results[0]  # return loss
 	
@@ -103,44 +99,75 @@ class AudioAgent(Agent):
 	def __init__(self, agent_id, class_count=2):
 		super().__init__(agent_id, class_count)
 		self.modality_id = 1
+		self.vggish = hub.load("https://tfhub.dev/google/vggish/1")
+
 		self.model = tf.keras.Sequential([
-			tf.keras.Input(shape=(TIMESTEPS, FEATURE_DIM)),
-			layers.Masking(mask_value=0.0),
-			layers.LSTM(128, return_sequences=False, use_cudnn=False),
-			layers.Dense(64, activation='relu'),
+			tf.keras.Input(shape=(None, 128)),
+			layers.LSTM(64),
 			layers.Dense(class_count)
-		])
+		])	
+		self.classifier = self.model
+
+	def extract_embedding(self, audio_waveform):
+		"""Takes a (possibly unknown-rank) waveform tensor and returns a [time_steps, 128] embedding."""
+		audio_waveform = tf.convert_to_tensor(audio_waveform, dtype=tf.float32)
+		# Ensure 1-D at runtime (handles unknown static shapes during graph tracing)
+		audio_waveform = tf.reshape(audio_waveform, [-1])  # shape [num_samples]
+		embedding = self.vggish(audio_waveform)
+		embedding.set_shape([None, 128])  # [time_steps, 128]
+		return embedding
 
 	def emit(self, event):
-		audio = tf.convert_to_tensor(event["audio_data"], dtype=tf.float32)
-		if len(audio.shape) == 1 or (len(audio.shape) > 1 and audio.shape[-1] != 1):
-			audio = tf.expand_dims(audio, axis=-1) # Ensure shape is (H, W, 1)
-		features = self.model(tf.expand_dims(audio, axis=0), training=False) # Add batch dimension
-		belief = tf.nn.softmax(features).numpy()[0]
+		waveform = event["audio_waveform"]
+		embedding = self.extract_embedding(waveform)
+		embedding = tf.expand_dims(embedding, axis=0)  # batch dimension
+		logits = self.model(embedding, training=False)
+		belief = tf.nn.softmax(logits).numpy()[0]
 		assert belief.shape[0] == self.class_count, f"Belief output shape mismatch: got {belief.shape}"
+		
 		return {
 			"agent_id": self.agent_id,
 			"belief": belief.tolist(),
 			"prediction": int(np.argmax(belief)),
 			"correct": (int(np.argmax(belief)) == event["label"]),
 			"modality_id": self.modality_id,
-			"hedge_weight": self.hedge_weight.numpy(), 
+			"hedge_weight": self.hedge_weight.numpy(),
 		}
 
-	def pretrain(self, train_data, epochs=10):
-		"""
-		Pre-train the audio agent on the training data.
-		"""	
-		dataset = extract_audio_dataset(train_data).prefetch(tf.data.AUTOTUNE)
+	def pretrain(self, train_data, epochs=10, batch_size=32):
+		"""Pre-train from raw waveforms."""
+		def extract_and_pair(x, y):
+			emb = self.extract_embedding(x)
+			emb.set_shape([None, 128])  # ensure shape [time_steps, 128]
+
+			return emb, y
+		
+		dataset = extract_audio_dataset(train_data) \
+			.map(extract_and_pair, num_parallel_calls=tf.data.AUTOTUNE) \
+			.cache() \
+			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True) \
+			.prefetch(tf.data.AUTOTUNE)
+
 		self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy"])
 		callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=2, restore_best_weights=True)
 		self.model.fit(dataset, epochs=epochs, verbose=1, callbacks=[callback])
 
-	def validate_pretraining(self, val_data):
+	def validate_pretraining(self, val_data, batch_size=32):
 		"""
 		Validate the pre-trained audio agent on the validation data.
 		"""
-		dataset = extract_audio_dataset(val_data).prefetch(tf.data.AUTOTUNE)
+		def extract_and_pair(x, y):
+			emb = self.extract_embedding(x)
+			emb.set_shape([None, 128])  # ensure shape [time_steps, 128]
+			return emb, y
+	
+		
+		dataset = extract_audio_dataset(val_data) \
+			.map(extract_and_pair, num_parallel_calls=tf.data.AUTOTUNE) \
+			.cache() \
+			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True) \
+			.prefetch(tf.data.AUTOTUNE)
+
 		results = self.model.evaluate(dataset, verbose=1)
 		return results[0]  # return loss
 
@@ -150,9 +177,11 @@ class AudioAgent(Agent):
 		x: input audio tensor
 		y: ground truth label
 		"""
-		x = event["audio_data"]
+		waveform = event["audio_waveform"]
 		with tf.GradientTape() as tape:
-			logits = self.model(tf.expand_dims(x, axis=0))
+			emb = self.extract_embedding(waveform)
+			emb = tf.expand_dims(emb, axis=0)  # add batch dimension
+			logits = self.model(emb)
 			loss = self.loss_fn(tf.convert_to_tensor([label]), logits)
 		grads = tape.gradient(loss, self.model.trainable_variables)
 		self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))

@@ -12,7 +12,7 @@ def pre_train_agents(agents, train_data, val_data):
             model_path = Path(f"./models/pretrained_agent_{agent.agent_id}.keras")
             if not model_path.exists():
                 print(f"Pre-training agent {agent.agent_id}...")
-                agent.pretrain(train_data=train_data, epochs=5)
+                agent.pretrain(train_data=train_data)
                 
                 # Save right after pretraining
                 agent.model.save(model_path)
