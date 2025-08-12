@@ -11,7 +11,7 @@ from util.sim_pretrain_agent import pre_train_agents
 from util.sim_log import setup_log_file
 from util.sim_update_hedge import update_hedge
 
-def main(filename): 
+def main(filename, pretrain): 
 
     print(tf.config.list_physical_devices("GPU"))
 
@@ -41,7 +41,7 @@ def main(filename):
     train_data, val_data, test_data = load_data()
    
     # Pre-train only the vision agent for now
-    pre_train_agents(agents, train_data=train_data, val_data=val_data)
+    pre_train_agents(agents, train_data, val_data, pretrain)
 
     # prompt user to continue training
     continue_training = input("Continue training? (y/n): ").strip().lower()
@@ -113,8 +113,10 @@ def main(filename):
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--name", help="Name for log file for this run")
+    parser.add_argument("-p", "--pretrain", action="store_true", help="Whether to pretrain agents")
     args = parser.parse_args()
     if not args.name:
         raise ValueError("Run name cannot be empty")
     run_name = args.name.strip()
-    main(run_name)
+    pretrain = args.pretrain
+    main(run_name, pretrain=pretrain)

@@ -46,17 +46,15 @@ def update_hedge(hedge_cfg, fusion_unit, emissions, gt, agents, round_idx, csv_w
 
     _state["correct_count"] += int(np.argmax(fused) == gt)
     correct_percentage = _state["correct_count"] / (round_idx + 1) * 100
-    hedge_weights = [float(
-            next(a for a in agents if a.agent_id == out['agent_id']).hedge_weight.numpy()
-        ) for out in emissions]
+    weights_by_id = {a.agent_id: float(a.hedge_weight.numpy()) for a in agents}
+    hedge_weights = [weights_by_id.get(i, np.nan) for i in sorted(weights_by_id)]
     csv_writer.writerow([
         round_idx,
         gt,
         f"{correct_percentage:.2f}%",
         f"{loss:.4f}",
         np.argmax(fused),
-        hedge_weights[0], 
-        hedge_weights[1]
+        *hedge_weights
     ])
     if round_idx % 100 == 0:
         print(

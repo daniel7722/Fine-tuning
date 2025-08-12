@@ -1,7 +1,7 @@
 from pathlib import Path
 import tensorflow as tf
 
-def pre_train_agents(agents, train_data, val_data):
+def pre_train_agents(agents, train_data, val_data, pretrain=False):
         """
         Pre-train agents on the training set.
         """
@@ -10,7 +10,7 @@ def pre_train_agents(agents, train_data, val_data):
         
         for agent in agents: 
             model_path = Path(f"./models/pretrained_agent_{agent.agent_id}.keras")
-            if not model_path.exists():
+            if pretrain or not model_path.exists():
                 print(f"Pre-training agent {agent.agent_id}...")
                 agent.pretrain(train_data=train_data)
                 
