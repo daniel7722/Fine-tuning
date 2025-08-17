@@ -1,21 +1,32 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 from tensorflow.keras.layers import LayerNormalization, MultiHeadAttention
+from util.sim_update_hedge import mix_beliefs_hedge
 
 class FusionUnit(tf.keras.Model):
-    def __init__(self, class_count=2, num_agents=4, num_modalities=4, hidden_dim=16, embedding_dim=8):
+    def __init__(self, class_count=2, num_agents=4, num_modalities=4, hidden_dim=16, embedding_dim=8, lambda_poe=0.5, epsilon=1e-12):
         super().__init__()
+        # attention parameters
         self.class_count = class_count
-        self.embedding_dim = embedding_dim # Dimension for agent and modality embeddings
-        # hidden_dim: Dimension for the internal latent representation in the attention block
-        self.hedge_weight = tf.Variable(tf.ones([num_agents], dtype=tf.float32), trainable=False)
+        self.embedding_dim = embedding_dim # Dimension for agent and modality embeddings 
+
+        # PoE parameters
+        self.lambda_poe = lambda_poe
+        self.epsilon = float(epsilon)
+
+        # Hedge parameters
+        self.last_pi = None          # shape [N]
+        self.last_o = None           # shape [N, K]
+        self.last_r = None           # shape [K]
+        self.last_p_hedge = None     # shape [K]
+        self.last_fused = None       # shape [K]
 
         # Learned embeddings
         self.agent_embeddings = layers.Embedding(input_dim=num_agents, output_dim=embedding_dim)
         self.modality_embeddings = layers.Embedding(input_dim=num_modalities, output_dim=embedding_dim)
 
         # Attention network
-        self.input_proj = layers.Dense(hidden_dim)
+        self.input_proj = layers.Dense(hidden_dim) # Dimension for the internal latent representation in the attention block
         self.attn_norm1 = LayerNormalization()
         self.attn_block = MultiHeadAttention(num_heads=2, key_dim=embedding_dim, dropout=0.1)
         self.attn_norm2 = LayerNormalization()
@@ -25,11 +36,16 @@ class FusionUnit(tf.keras.Model):
             layers.Dense(hidden_dim)
         ])
         self.output_layer = layers.Dense(class_count)
+
+        # Compile the model
         optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0) # Clip gradients to prevent exploding gradients
         loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.05)
         self.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
+        
+        # Mixer layer to assign dynamic weights to each agent's logits
+        self.mixer = layers.Dense(1)
 
-    def call(self, agent_outputs, training=False): 
+    def call(self, agent_outputs, agents, p_hedge=None, training=False):
         """
         agent_outputs: list of dicts with keys: 
           - 'belief': numpy array or tensor of shape [class_count]
@@ -39,7 +55,8 @@ class FusionUnit(tf.keras.Model):
           - fused_output: softmax tensor of shape [class_count]
         """
         x = []
-        for out in agent_outputs:             
+        for out in agent_outputs:
+            # Agent's prediction
             belief = tf.convert_to_tensor(out['belief'], dtype=tf.float32)
             # Embed identity
             agent_id = tf.convert_to_tensor(out['agent_id'], dtype=tf.int32)
@@ -58,47 +75,62 @@ class FusionUnit(tf.keras.Model):
             ], axis=0)
             x.append(combined)
 
-        x = tf.stack(x, axis=0) # shape [num_agents, 2 (belief vector) + 1 (trust) + 2*embedding_dim]
-        x = tf.expand_dims(x, axis=0)  # [1 (batch_num), num_agents, features]
+        x = tf.stack(x, axis=0) # shape [N, K + 2E + 1]
+        x = tf.expand_dims(x, axis=0)  # [1 (batch_num), N, K + 2E + 1]
 
         # Project to hidden_dim first
-        x_proj = self.input_proj(x) # [1 (batch_num), num_agents, hidden_dim]
+        x_proj = self.input_proj(x) # [1 (batch_num), N, H]
 
         # Attention Block (self-attention)
-        attn_out = self.attn_block(query=x_proj, key=x_proj, value=x_proj)
+        attn_out = self.attn_block(query=x_proj, key=x_proj, value=x_proj, training=training) # [1, N, H]
         attn_out = self.attn_norm1(attn_out + x_proj)  # Residual connection + norm
 
         # Feed-forward network
         # Encode context-aware representations per agent (after attention)
-        ffn_out = self.ffn(attn_out) 
+        ffn_out = self.ffn(attn_out, training=training) # [1, N, H]
         ffn_out = self.attn_norm2(ffn_out + attn_out)  # Residual connection + norm
+        ffn_out = tf.squeeze(ffn_out, axis=0)  # [N, H] removing batch dimension
 
-        ffn_out = tf.squeeze(ffn_out, axis=0)  # [num_agents, hidden_dim] removing batch dimension
+        # Predict class logits for each agent independently -> o
+        attn_logits = self.output_layer(ffn_out) # [N, K]
+        # Assign dynamic weights to each agent's logits -> s
+        agent_weights = self.mixer(ffn_out) # [N, 1]
 
-        # Predict class logits for each agent independently
-        attn_logits = self.output_layer(ffn_out) # [num_agents, class_count]
-        # Assign dynamic weights to each agent's logits
-        agent_weights = tf.nn.softmax(layers.Dense(1)(ffn_out), axis=0)
-        
-        # hedge_weights = self.hedge_weight
-        # normalised_hedge = hedge_weights / tf.reduce_sum(hedge_weights)
-        # combined_weights = tf.squeeze(agent_weights, axis=-1) * normalised_hedge
-        # combined_weights = combined_weights / tf.reduce_sum(combined_weights) # Normalize weights
-        combined_weights = tf.squeeze(agent_weights, axis=-1)
-        combined_weights = tf.expand_dims(combined_weights, axis=-1)
-        # Fuse predictions into single system decision
-        aggregated_logits = tf.reduce_sum(combined_weights * attn_logits, axis=0)
+        # agent_weights: [N, 1] -> π
+        pi = tf.nn.softmax(agent_weights, axis=0)         # [N,1]
+        pi = tf.squeeze(pi, axis=-1)                      # [N]
 
-        self.last_logits = aggregated_logits
-        fused_output = tf.nn.softmax(aggregated_logits)
-        return fused_output
+        # Store per-agent logits and π
+        self.last_o = attn_logits                         # [N, K]
+        self.last_pi = pi
+
+        # Fused attention logits and probs
+        aggregated_logits = tf.reduce_sum(tf.expand_dims(pi, -1) * attn_logits, axis=0)  # [K]
+        r = tf.nn.softmax(aggregated_logits)              # [K]
+        self.last_r = r
+
+        # Hedge path: p_Hedge = Σ_i w_i * p_i
+        if p_hedge is None:
+            p_hedge = mix_beliefs_hedge(agent_outputs, agents, epsilon=self.epsilon)  # [K]
+        else:
+            p_hedge = tf.convert_to_tensor(p_hedge, dtype=tf.float32)
+        self.last_p_hedge = p_hedge
+
+        # Produce of Experts (PoE) fusion
+        lam = self.lambda_poe
+        log_p = (1.0 - lam) * tf.math.log(p_hedge + self.epsilon) + lam * tf.math.log(r + self.epsilon)  # [K]
+        # Convert back to probs
+        fused = tf.nn.softmax(log_p)  # [K]  (equivalent to renormalized exp(log_p))
+        self.last_fused = fused
+        return fused
     
-    def train_on_single_example(self, agent_outputs, true_label):
+    def train_on_single_example(self, agent_outputs, agents, true_label):
         with tf.GradientTape() as tape:
-            fused_output = self.call(agent_outputs, training=True)
-            true_label_tensor = tf.convert_to_tensor([true_label], dtype=tf.int32)
-            loss = tf.keras.losses.sparse_categorical_crossentropy(true_label_tensor, self.last_logits, from_logits=True)
-
+            fused = self.call(agent_outputs, agents, training=True)  # p_lambda (softmax(log_p))
+            loss = tf.keras.losses.sparse_categorical_crossentropy(
+                tf.convert_to_tensor([true_label], tf.int32),
+                fused[tf.newaxis, ...], from_logits=False
+            )
         grads = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-        return loss.numpy().item()
+        return fused.numpy(), float(tf.reduce_mean(loss).numpy())

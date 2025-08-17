@@ -18,7 +18,7 @@ def pre_train_agents(agents, train_data, val_data, pretrain=False):
                 agent.model.save(model_path)
                 print(f"Saved pre-trained model for agent {agent.agent_id} to {model_path}")
             else:
-                agent.model = tf.keras.models.load_model(model_path)
+                agent.model = tf.keras.models.load_model(model_path, safe_mode=False)
                 agent.model.compile(optimizer=agent.optimizer, loss=agent.loss_fn, metrics=["accuracy"])
                 agent.backbone=agent.model.layers[0]
                 agent.classifier=agent.model.layers[1]

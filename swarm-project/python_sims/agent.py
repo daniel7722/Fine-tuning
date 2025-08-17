@@ -6,6 +6,50 @@ from tensorflow.keras import layers
 import tensorflow_hub as hub
 from util.sim_load_data import extract_vision_dataset, extract_audio_dataset
 
+@tf.keras.utils.register_keras_serializable()
+class ComputeMaskLayer(layers.Layer):
+    def call(self, x):
+        # Produces mask of shape (B, T, 1) where 1 marks non-zero embedding rows
+        return tf.expand_dims(
+            tf.cast(tf.reduce_any(tf.not_equal(x, 0.0), axis=-1), tf.float32),
+            axis=-1,
+        )
+
+    def compute_output_shape(self, input_shape):
+        # (B, T, D) -> (B, T, 1)
+        return (input_shape[0], input_shape[1], 1)
+
+    def get_config(self):
+        return {}
+
+
+@tf.keras.utils.register_keras_serializable()
+class NegInfFromMask(layers.Layer):
+    def call(self, m):
+        # Input mask m is (B, T, 1) in {0,1}. Return (1-m)*1e9 with same shape.
+        return (1.0 - m) * 1e9
+
+    def compute_output_shape(self, input_shape):
+        # Shape preserving: (B, T, 1)
+        return input_shape
+
+    def get_config(self):
+        return {}
+
+
+@tf.keras.utils.register_keras_serializable()
+class TemporalSum1D(layers.Layer):
+    def call(self, x):
+        # Reduce over time axis 1: (B, T, D) -> (B, D)
+        return tf.reduce_sum(x, axis=1)
+
+    def compute_output_shape(self, input_shape):
+        # (B, T, D) -> (B, D)
+        return (input_shape[0], input_shape[2])
+
+    def get_config(self):
+        return {}
+
 TIMESTEPS = 100
 FEATURE_DIM = 64
 
@@ -14,7 +58,7 @@ class Agent(ABC):
 	def __init__(self, agent_id, class_count=2, ema_alpha=0.3):
 		self.agent_id = agent_id
 		self.class_count = class_count
-		self.hedge_weight = tf.Variable(1.0, trainable=False)
+		self.hedge_weight = tf.Variable(float(1.0/class_count), trainable=False)
 		self.optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0)  
 		self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
@@ -48,8 +92,8 @@ class VisionAgent(Agent):
 		])
 		self.model = tf.keras.Sequential([self.backbone, self.classifier])
 
-	def emit(self, event): 
-		image = event["vision_data"] # Expected to be preprocessed image tensor,
+	def emit(self, data): 
+		image = data["vision_data"] # Expected to be preprocessed image tensor,
 		logits = self.model(tf.expand_dims(image, axis=0), training=False) # Add batch dimension
 		belief = tf.nn.softmax(logits).numpy()[0]
 		assert belief.shape[0] == self.class_count, f"Belief output shape mismatch: got {belief.shape}"
@@ -57,7 +101,7 @@ class VisionAgent(Agent):
 			"agent_id": self.agent_id,
 			"belief": belief.tolist(),
 			"prediction": int(np.argmax(belief)),
-			"correct": (int(np.argmax(belief)) == event["label"]),
+			"correct": (int(np.argmax(belief)) == data["label"]),
 			"modality_id": self.modality_id,
 			"hedge_weight": self.hedge_weight.numpy(), 
 		}
@@ -96,138 +140,131 @@ class VisionAgent(Agent):
 
 
 class AudioAgent(Agent): 
-	def __init__(self, agent_id, class_count=2):
+	def __init__(self, agent_id, class_count=28):
 		super().__init__(agent_id, class_count)
 		self.modality_id = 1
 		self.vggish = hub.KerasLayer(
-			"https://tfhub.dev/google/vggish/1", 
+			"https://tfhub.dev/google/vggish/1",
 			input_shape=[],
 			dtype=tf.float32,
 			trainable=False
 		)
 
-		# Build audio classifier with Functional API (BiLSTM + attention pooling)
+		# Build audio classifier with Functional API (BiLSTM + attention pooling, proper Keras masking)
 		reg = tf.keras.regularizers.l2(1e-4)
-		inp = tf.keras.Input(shape=(None, 128))                       # (B, T, 128)
+		inp = tf.keras.Input(shape=(None, 128))  # (B, T, 128)
 
-		# Propagate mask to RNNs
-		masked = layers.Masking(mask_value=0.0)(inp)                  # (B, T, 128)
+		# Masking for padded embeddings
+		masked = layers.Masking(mask_value=0.0)(inp)  # (B, T, 128)
 
 		# Sequence encoder with L2 regularization
 		h = layers.Bidirectional(
 			layers.LSTM(128, return_sequences=True, kernel_regularizer=reg)
 		)(masked)  # (B, T, 256)
 
-		# Attention over time
-		attn_logits = layers.Dense(1, kernel_regularizer=reg)(h)      # (B, T, 1)
+		# Attention mechanism using Keras layers
+		attn_logits = layers.Dense(1, kernel_regularizer=reg)(h)  # (B, T, 1)
 
-		# Build a mask tensor with shape (B, T, 1) using Lambda so it remains symbolic
-		mask = layers.Lambda(
-			lambda t: tf.expand_dims(
-				tf.cast(tf.reduce_any(tf.not_equal(t, 0.0), axis=-1), tf.float32),
-				axis=-1,
-			)
-		)(inp)  # (B, T, 1)
+		mask = ComputeMaskLayer(name="mask")(inp)
 
-		# Apply large negative bias to padded positions before softmax
-		neg_inf = layers.Lambda(lambda m: (1.0 - m) * 1e9)(mask)
-		attn_logits_masked = layers.Subtract()([attn_logits, neg_inf])
+		# Large negative bias for padded positions (via Keras layers)
+		neg_inf = NegInfFromMask(name="neg_inf")(mask)
+		attn_logits_masked = layers.Subtract(name="mask_attn_logits")([attn_logits, neg_inf])
 
 		attn = layers.Softmax(axis=1, name="attn_weights")(attn_logits_masked)  # (B, T, 1)
 
 		# Context vector: sum_t (h_t * a_t)
-		weighted = layers.Multiply()([h, attn])                       # (B, T, 256)
-		context = layers.Lambda(lambda t: tf.reduce_sum(t, axis=1), name="attn_pool")(weighted)  # (B, 256)
+		weighted = layers.Multiply()([h, attn])  # (B, T, 256)
+		context = TemporalSum1D(name="attn_pool")(weighted)  # (B, 256)
 
 		x = layers.Dropout(0.5)(context)
-		out = layers.Dense(class_count, kernel_regularizer=reg)(x)    # (B, C)
+		out = layers.Dense(class_count, kernel_regularizer=reg)(x)  # (B, C)
 
 		self.model = tf.keras.Model(inp, out, name="audio_bilstm_attn")
-		# baseline: mean over time, then linear
-		# class MyLayer(tf.keras.layers.Layer): 
-		# 	def call(self, x): 
-		# 		return tf.reduce_mean(x, axis=1)
-		# inputs = tf.keras.Input(shape=(None, 128))
-		# x = MyLayer()(inputs)                 # (B, 128)
-		# outputs = tf.keras.layers.Dense(28)(x)
-		# self.model = tf.keras.Model(inputs, outputs)
-		# self.classifier = self.model
+
+	@tf.function
+	def _rand_gain(self, x):
+		db = tf.random.uniform([], minval=-3.0, maxval=3.0)
+		gain = tf.pow(10.0, db / 20.0)
+		return x * gain
+
+	@tf.function
+	def _time_shift(self, x):
+		sr = 16000
+		max_shift = tf.cast(0.2 * tf.cast(sr, tf.float32), tf.int32)
+		shift = tf.random.uniform([], -max_shift, max_shift + 1, dtype=tf.int32)
+		return tf.roll(x, shift=shift, axis=0)
+
+	@tf.function
+	def _add_noise(self, x):
+		std = tf.math.reduce_std(x)
+		noise = tf.random.normal(tf.shape(x), stddev=tf.maximum(1e-4, 0.03 * std))
+		return x + noise
+
+	@tf.function
+	def _maybe_aug(self, x):
+		def apply_or_not(fn, sig):
+			return tf.cond(tf.random.uniform([]) < 0.5, lambda: fn(sig), lambda: sig)
+		x = apply_or_not(self._rand_gain, x)
+		x = apply_or_not(self._time_shift, x)
+		x = apply_or_not(self._add_noise, x)
+		return tf.clip_by_value(x, -1.0, 1.0)
+
+	@tf.function
+	def preprocess_and_embed(self, waveform, augment=False):
+		# Cast & ensure 1-D
+		x = tf.cast(waveform, tf.float32)
+		x = tf.reshape(x, [-1])
+		x = tf.clip_by_value(x, -1.0, 1.0)
+		x = tf.cond(tf.convert_to_tensor(augment), lambda: self._maybe_aug(x), lambda: x)
+		emb = self.vggish(x)
+		emb.set_shape([None, 128])
+		return emb
 
 	def extract_embedding(self, audio_waveform):
-		"""Takes a (possibly unknown-rank) waveform tensor and returns a [time_steps, 128] embedding."""
-		audio_waveform = tf.convert_to_tensor(audio_waveform, dtype=tf.float32)
-		# Ensure 1-D at runtime (handles unknown static shapes during graph tracing)
-		audio_waveform = tf.reshape(audio_waveform, [-1])  # shape [num_samples]
-		embedding = self.vggish(audio_waveform)
-		embedding.set_shape([None, 128])  # [time_steps, 128]
-		return embedding
+		return self.preprocess_and_embed(audio_waveform, augment=False)
 
-	def emit(self, event):
-		waveform = event["audio_waveform"]
-		embedding = self.extract_embedding(waveform)
-		embedding = tf.expand_dims(embedding, axis=0)  # batch dimension
-		logits = self.model(embedding, training=False)
-		belief = tf.nn.softmax(logits).numpy()[0]
-		assert belief.shape[0] == self.class_count, f"Belief output shape mismatch: got {belief.shape}"
-		
+	def emit(self, data):
+		"""Use the exact dataset → preprocess → padded_batch → model path for a single example."""
+		# 1) Wrap the incoming dict into a 1-element Dataset
+		single_ds = tf.data.Dataset.from_tensors({
+			"audio_waveform": data["audio_waveform"],
+			"label": data["label"],
+		})
+
+		# 2) Reuse the exact loader + preprocessing; NO augmentation at inference
+		ds = (
+			extract_audio_dataset(single_ds)
+			.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y),
+				num_parallel_calls=tf.data.AUTOTUNE)
+			.padded_batch(1, padded_shapes=([None, 128], []), drop_remainder=True)
+			.prefetch(tf.data.AUTOTUNE)
+		)
+
+		# 3) Materialize the single batch and run the model
+		(emb_batch, y_batch) = next(iter(ds))                 # emb_batch: (1, T, 128), y_batch: (1,)
+		logits = self.model(emb_batch, training=False)        # (1, C)
+
+		belief = tf.nn.softmax(logits)[0].numpy()
+		pred   = int(np.argmax(belief))
+		gt     = int(y_batch[0].numpy())
+
 		return {
 			"agent_id": self.agent_id,
 			"belief": belief.tolist(),
-			"prediction": int(np.argmax(belief)),
-			"correct": (int(np.argmax(belief)) == event["label"]),
+			"prediction": pred,
+			"correct": (pred == gt),
 			"modality_id": self.modality_id,
 			"hedge_weight": self.hedge_weight.numpy(),
 		}
 
-	def pretrain(self, train_data, val_data=None, epochs=50, batch_size=32):
+	def pretrain(self, train_data, val_data=None, epochs=10, batch_size=32):
 		"""Pre-train from raw waveforms with validation monitoring and light augmentation."""
 		sr = 16000
 
-		# --- label smoothing loss just for training this agent ---
-		# loss_with_ls = tf.keras.losses.SparseCategoricalCrossentropy(
-		# 	from_logits=True, label_smoothing=0.1
-		# )
-
-		# --- augmentation functions on waveform ---
-		def _rand_gain(x):
-			# +/- 3 dB
-			db = tf.random.uniform([], minval=-3.0, maxval=3.0)
-			gain = tf.pow(10.0, db / 20.0)
-			return x * gain
-
-		def _time_shift(x):
-			# +/- 0.2s
-			max_shift = int(0.2 * sr)
-			shift = tf.random.uniform([], -max_shift, max_shift + 1, dtype=tf.int32)
-			return tf.roll(x, shift=shift, axis=0)
-
-		def _add_noise(x):
-			# low-level Gaussian noise relative to signal std
-			std = tf.math.reduce_std(x)
-			noise = tf.random.normal(tf.shape(x), stddev=tf.maximum(1e-4, 0.03 * std))
-			return x + noise
-
-		def _maybe_aug(x):
-			# Apply each augmentation with 0.5 prob independently
-			def apply_or_not(fn, sig):
-				return tf.cond(tf.random.uniform([]) < 0.5, lambda: fn(sig), lambda: sig)
-			x = apply_or_not(_rand_gain, x)
-			x = apply_or_not(_time_shift, x)
-			x = apply_or_not(_add_noise, x)
-			return tf.clip_by_value(x, -1.0, 1.0)
-
-		# pair (waveform -> embedding, label)
-		def extract_and_pair(x, y, augment=False):
-			if augment:
-				x = _maybe_aug(x)
-			emb = self.extract_embedding(x)
-			emb.set_shape([None, 128])
-			return emb, y
-
-		# --- training dataset ---
 		train_ds = (
 			extract_audio_dataset(train_data)
-			.map(lambda x, y: extract_and_pair(x, y, augment=True), num_parallel_calls=tf.data.AUTOTUNE)
+			.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
 			.cache()
 			.shuffle(10000)
 			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True)
@@ -239,7 +276,7 @@ class AudioAgent(Agent):
 		if val_data is not None:
 			val_ds = (
 				extract_audio_dataset(val_data)
-				.map(lambda x, y: extract_and_pair(x, y, augment=False), num_parallel_calls=tf.data.AUTOTUNE)
+				.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
 				.cache()
 				.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True)
 				.prefetch(tf.data.AUTOTUNE)
@@ -264,8 +301,12 @@ class AudioAgent(Agent):
 
 		class_weight = compute_class_weights(train_data)
 
-		# compile with label smoothing
-		self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy"])
+		# compile with from_logits=True, no label_smoothing
+		self.model.compile(
+			optimizer=self.optimizer,
+			loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+			metrics=["accuracy"]
+		)
 
 		callbacks = [
 			tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss' if val_ds is not None else 'loss',
@@ -287,16 +328,14 @@ class AudioAgent(Agent):
 		"""
 		Validate the pre-trained audio agent on the validation data.
 		"""
-		def extract_and_pair(x, y):
-			emb = self.extract_embedding(x)
-			emb.set_shape([None, 128])  # ensure shape [time_steps, 128]
-			return emb, y
 
-		dataset = extract_audio_dataset(val_data) \
-			.map(extract_and_pair, num_parallel_calls=tf.data.AUTOTUNE) \
-			.cache() \
-			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True) \
+		dataset = (
+			extract_audio_dataset(val_data)
+			.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
+			.cache()
+			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True)
 			.prefetch(tf.data.AUTOTUNE)
+		)
 
 		# ensure compiled for evaluation
 		if not hasattr(self.model, 'loss') or self.model.loss is None:
@@ -314,7 +353,7 @@ class AudioAgent(Agent):
 		"""
 		waveform = event["audio_waveform"]
 		with tf.GradientTape() as tape:
-			emb = self.extract_embedding(waveform)
+			emb = self.preprocess_and_embed(waveform, augment=False)
 			emb = tf.expand_dims(emb, axis=0)  # add batch dimension
 			logits = self.model(emb)
 			loss = self.loss_fn(tf.convert_to_tensor([label]), logits)

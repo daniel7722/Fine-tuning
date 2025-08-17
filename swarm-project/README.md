@@ -289,7 +289,7 @@ Round 2400: Loss: 0.0293, Correct: 75.43%
 By overcoming overfitting for vision agent, leaving audio agent random, and leverage that with hard-coded hedge weights that always trust vision more, there's accuracy improvement with training data. Although, vision always produce accurate result, the fusion accuracy is at quite low 75%, which is great improvement from random 4% but it is still affected by audio agent, which is expected. But the level of influence has no quantifiable way to explain. That is, fixing hedge weight at 0.95 vs 0.05 will always leave some level of trust towards audio agent, an amount that cannot explained by the difference between fully trusting vision agent, which accuracy is roughly 0.9 but strictly speaking unknown, and 95% trusting. This is still area to dig deeper.
 
 
-### 08-07 (Agent Pretraining Improvements & Error Fixes)
+## 08-07 (Agent Pretraining Improvements & Error Fixes)
 - **Audio agent pretraining**:  
   - Adjusted `AudioAgent` input shape & LSTM handling to prevent `ValueError` from Dense expecting (batch,64) but receiving (batch,time,128).  
   - Fixed embedding extraction and ensured padded batching shape `[None, 128]`.
@@ -301,7 +301,7 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
   - Added logic to avoid deadlocks when one thread finishes early.  
   - Made iterator handling safe for `OUT_OF_RANGE` so all threads exit cleanly.
 
-### 08-08 (Full Pretraining + Fusion Unit Run)
+## 08-08 (Full Pretraining + Fusion Unit Run)
 - **Full run with ~2.5k rounds**:  
   - Pretrained both agents successfully (Vision ~0.83 acc final, Audio slow but improving).  
   - Ran fusion unit with fixed hedge 0.95 / 0.05.  
@@ -317,7 +317,7 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
     - Optional temperature scaling in fusion logits.  
   - Expect loss curve to get noisier due to dynamic weighting.
   
-  ### 08-12
+## 08-12
   1. Fixing Audio Model Input & Training Pipeline
 	•	Discovered that the AudioAgent was throwing shape errors (Dense expecting (batch, 64) but getting (batch, time, 128)).
 	•	Adjusted input shape & LSTM handling so the recurrent output was pooled/flattened before passing to Dense layers.
@@ -371,3 +371,35 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
 	•	Add weight clipping & renormalization.
 	•	Optionally add temperature scaling to fusion logits for calibration.
 	•	Longer term: test with richer datasets & more balanced audio model so fusion can meaningfully outperform vision-only.
+
+### Plotting
+# Heatmap for the final round
+python -m python_sims.util.plotting \
+  --log_dir logs/2025-08-12 \
+  --perclass_csv AVE_perclass.csv \
+  --heatmap out/heatmap_last.png
+
+# Heatmap for a specific round
+python -m python_sims.util.plotting \
+  --log_dir logs/2025-08-12 \
+  --perclass_csv AVE_perclass.csv \
+  --round 1200 \
+  --heatmap out/heatmap_r1200.png
+
+# Accuracy/Loss curves
+python -m python_sims.util.plotting \
+  --log_dir logs/2025-08-12 \
+  --main_csv AVE_run.csv \
+  --curves out/curves.png
+
+# Hedge weights
+python -m python_sims.util.plotting \
+  --log_dir logs/2025-08-12 \
+  --main_csv AVE_run.csv \
+  --hedge out/hedge.png
+
+# Per-class curve over time (e.g., class 7)
+python -m python_sims.util.plotting \
+  --log_dir logs/2025-08-12 \
+  --perclass_csv AVE_perclass.csv \
+  --class_curve 7 out/class7_curve.png
