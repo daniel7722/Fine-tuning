@@ -30,11 +30,15 @@ def setup_log_file(filename):
             "fused_B0_pred", "acc_B0",
             "fused_M1_pred", "acc_M1",
             "cos_sim_beliefs",
+            "p_b0_gt", "p_m1_gt",
+            "loss_b0", "loss_m1",
+            "pi0", "pi1",
+            "m1_conf_top1", "m1_margin",
         ]
     )
     return log_file, csv_writer
 
-def write_log(csv_writer, round_idx, gt, preds, hedges, fused_b0_pred, acc_b0, fused_m1_pred, acc_m1, cos_sim):
+def write_log(csv_writer, round_idx, gt, preds, hedges, fused_b0_pred, acc_b0, fused_m1_pred, acc_m1, cos_sim, p_b0_gt="", p_m1_gt="", loss_b0="", loss_m1="", pi0="", pi1="", m1_conf_top1="", m1_margin=""):
     # --- Write CSV row (list-based, matches header in sim_log.py) ---
     csv_writer.writerow([
         round_idx,
@@ -44,6 +48,10 @@ def write_log(csv_writer, round_idx, gt, preds, hedges, fused_b0_pred, acc_b0, f
         fused_b0_pred, acc_b0,
         fused_m1_pred, acc_m1,
         cos_sim,
+        p_b0_gt, p_m1_gt,
+        loss_b0, loss_m1,
+        pi0, pi1,
+        m1_conf_top1, m1_margin,
     ])
 
 def write_log_entry(csv_writer, round_idx, gt, correct_percentage, loss, fused, hedge_weights, agent_predictions, agent_correct_flags):

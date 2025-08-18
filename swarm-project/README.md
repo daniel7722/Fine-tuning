@@ -373,6 +373,7 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
 	•	Longer term: test with richer datasets & more balanced audio model so fusion can meaningfully outperform vision-only.
 
 ## 08-18
+### new split
 []
 Pre-training agents...
 Pre-training agent 0...
@@ -459,34 +460,96 @@ Starting training...
 [EVAL:val_final] n=829 | a0=0.713  a1=0.697  b0=0.697  m1=0.840
 [EVAL:test_final] n=829 | a0=0.688  a1=0.690  b0=0.691  m1=0.819
 
-### Plotting
-# Heatmap for the final round
-python -m python_sims.util.plotting \
-  --log_dir logs/2025-08-12 \
-  --perclass_csv AVE_perclass.csv \
-  --heatmap out/heatmap_last.png
-
-# Heatmap for a specific round
-python -m python_sims.util.plotting \
-  --log_dir logs/2025-08-12 \
-  --perclass_csv AVE_perclass.csv \
-  --round 1200 \
-  --heatmap out/heatmap_r1200.png
-
-# Accuracy/Loss curves
-python -m python_sims.util.plotting \
-  --log_dir logs/2025-08-12 \
-  --main_csv AVE_run.csv \
-  --curves out/curves.png
-
-# Hedge weights
-python -m python_sims.util.plotting \
-  --log_dir logs/2025-08-12 \
-  --main_csv AVE_run.csv \
-  --hedge out/hedge.png
-
-# Per-class curve over time (e.g., class 7)
-python -m python_sims.util.plotting \
-  --log_dir logs/2025-08-12 \
-  --perclass_csv AVE_perclass.csv \
-  --class_curve 7 out/class7_curve.png
+### Additional metrics: 
+[]
+Pre-training agents...
+Loaded pre-trained model for agent 0 from disk.
+Loaded pre-trained model for agent 1 from disk.
+Pre-training complete.
+Validating pre-trained agents...
+2025-08-18 15:24:37.495198: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:381] TFRecordDataset `buffer_size` is unspecified, default to 262144
+      7/Unknown 5s 304ms/step - accuracy: 0.7014 - loss: 0.89302025-08-18 15:24:39.826580: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+/Users/danielhuang/tinyML/fine-tuning-env/lib/python3.10/site-packages/keras/src/trainers/epoch_iterator.py:151: UserWarning: Your input ran out of data; interrupting training. Make sure that your dataset or generator can generate at least `steps_per_epoch * epochs` batches. You may need to use the `.repeat()` function when building your dataset.
+  self._interrupted_warning()
+7/7 ━━━━━━━━━━━━━━━━━━━━ 5s 307ms/step - accuracy: 0.6918 - loss: 0.8799
+Agent 0 validation loss: 0.7878
+      7/Unknown 12s 2s/step - accuracy: 0.7419 - loss: 0.88502025-08-18 15:24:53.486692: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+7/7 ━━━━━━━━━━━━━━━━━━━━ 13s 2s/step - accuracy: 0.7297 - loss: 0.8916
+Agent 1 validation loss: 0.9382
+Continue training? (y/n): y
+Starting training...
+[Round 0] GT label = 18
+  Agent 0 pred=18 correct=True hedge=0.5000
+  Agent 1 pred=25 correct=False hedge=0.5000
+[Round 1] GT label = 2
+  Agent 0 pred=2 correct=True hedge=0.5202
+  Agent 1 pred=2 correct=True hedge=0.4798
+[Round 2] GT label = 22
+  Agent 0 pred=22 correct=True hedge=0.5244
+  Agent 1 pred=22 correct=True hedge=0.4756
+[EVAL:val@500::agent0] micro-acc=0.705  macro-F1=0.694
+[EVAL:val@500::agent0] top confusions: [(27, 17, 4), (14, 27, 3), (6, 3, 3), (17, 14, 2), (9, 27, 2)]
+[EVAL:val@500::agent1] micro-acc=0.705  macro-F1=0.684
+[EVAL:val@500::agent1] top confusions: [(3, 11, 3), (9, 14, 3), (20, 11, 2), (17, 27, 2), (10, 24, 2)]
+[EVAL:val@500::B0] micro-acc=0.815  macro-F1=0.797
+[EVAL:val@500::B0] top confusions: [(9, 14, 4), (2, 22, 2), (20, 11, 2), (17, 27, 2), (6, 3, 2)]
+[EVAL:val@500::M1] micro-acc=0.795  macro-F1=0.776
+[EVAL:val@500::M1] top confusions: [(9, 14, 4), (27, 17, 3), (6, 3, 3), (20, 13, 1), (23, 3, 1)]
+[EVAL:val@500] Top-5 per-class gains (acc, f1): [(15, 0.4285714285713673, 0.20606060606057897), (21, 0.09999999999998999, 0.10526315789472573), (4, 0.07142857142856629, 0.03968253968253854), (13, 0.0, -0.14285714285708861), (14, 0.0, 0.0)]
+[EVAL:val@500] n=200 | a0=0.705  a1=0.705  b0=0.815  m1=0.795
+2025-08-18 15:43:50.209051: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+[EVAL:val@1000::agent0] micro-acc=0.705  macro-F1=0.694
+[EVAL:val@1000::agent0] top confusions: [(27, 17, 4), (14, 27, 3), (6, 3, 3), (17, 14, 2), (9, 27, 2)]
+[EVAL:val@1000::agent1] micro-acc=0.705  macro-F1=0.684
+[EVAL:val@1000::agent1] top confusions: [(3, 11, 3), (9, 14, 3), (20, 11, 2), (17, 27, 2), (10, 24, 2)]
+[EVAL:val@1000::B0] micro-acc=0.705  macro-F1=0.684
+[EVAL:val@1000::B0] top confusions: [(3, 11, 3), (9, 14, 3), (20, 11, 2), (17, 27, 2), (10, 24, 2)]
+[EVAL:val@1000::M1] micro-acc=0.810  macro-F1=0.782
+[EVAL:val@1000::M1] top confusions: [(9, 14, 4), (17, 27, 2), (20, 11, 2), (6, 3, 2), (20, 13, 1)]
+[EVAL:val@1000] Top-5 per-class gains (acc, f1): [(3, 0.5714285714284897, 0.39999999999989555), (24, 0.4285714285713673, 0.3179487179486875), (4, 0.35714285714283156, 0.2329192546583555), (10, 0.2499999999999687, 0.29411764705877974), (16, 0.22222222222219756, 0.16959064327484197)]
+[EVAL:val@1000] n=200 | a0=0.705  a1=0.705  b0=0.705  m1=0.810
+[EVAL:val_final::agent0] micro-acc=0.713  macro-F1=0.713
+[EVAL:val_final::agent0] top confusions: [(1, 5, 9), (14, 27, 9), (9, 27, 9), (6, 3, 8), (27, 17, 8)]
+[EVAL:val_final::agent1] micro-acc=0.697  macro-F1=0.667
+[EVAL:val_final::agent1] top confusions: [(17, 27, 12), (24, 10, 9), (3, 11, 7), (5, 1, 7), (3, 6, 6)]
+[EVAL:val_final::B0] micro-acc=0.697  macro-F1=0.667
+[EVAL:val_final::B0] top confusions: [(17, 27, 12), (24, 10, 9), (3, 11, 7), (5, 1, 7), (3, 6, 6)]
+[EVAL:val_final::M1] micro-acc=0.805  macro-F1=0.779
+[EVAL:val_final::M1] top confusions: [(6, 3, 7), (5, 1, 7), (9, 14, 6), (12, 8, 4), (18, 2, 4)]
+[EVAL:val_final] Top-5 per-class gains (acc, f1): [(3, 0.40540540540539444, 0.27368421052626846), (24, 0.33333333333332404, 0.16153846153846096), (13, 0.24999999999998757, 0.19367588932806035), (17, 0.24324324324323665, 0.15539906103283652), (25, 0.22727272727271697, 0.27999999999997816)]
+[EVAL:val_final] n=829 | a0=0.713  a1=0.697  b0=0.697  m1=0.805
+[EVAL:test_final::agent0] micro-acc=0.688  macro-F1=0.679
+[EVAL:test_final::agent0] top confusions: [(6, 3, 10), (1, 5, 9), (11, 4, 7), (14, 27, 7), (9, 27, 6)]
+[EVAL:test_final::agent1] micro-acc=0.690  macro-F1=0.650
+[EVAL:test_final::agent1] top confusions: [(6, 3, 10), (3, 6, 10), (17, 27, 9), (20, 11, 7), (6, 11, 7)]
+[EVAL:test_final::B0] micro-acc=0.691  macro-F1=0.651
+[EVAL:test_final::B0] top confusions: [(6, 3, 10), (3, 6, 10), (17, 27, 9), (20, 11, 7), (6, 11, 7)]
+[EVAL:test_final::M1] micro-acc=0.791  macro-F1=0.759
+[EVAL:test_final::M1] top confusions: [(6, 3, 11), (20, 11, 7), (3, 6, 7), (17, 27, 6), (13, 4, 5)]
+[EVAL:test_final] Top-5 per-class gains (acc, f1): [(13, 0.3999999999999801, 0.2880523731587573), (3, 0.3243243243243155, 0.22996515679442425), (24, 0.27777777777777, 0.16347687400318567), (25, 0.2727272727272604, 0.3199999999999766), (19, 0.24999999999998446, 0.07407407407406996)]
+[EVAL:test_final] n=829 | a0=0.688  a1=0.690  b0=0.691  m1=0.791
+(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python3 python_sims.metric.plotting.py
+python3: can't open file '/Users/danielhuang/tinyML/Fine-tuning/swarm-project/python_sims.metric.plotting.py': [Errno 2] No such file or directory
+(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python3 python_sims/metric/plotting.py 
+{'Agent0': np.float64(0.6967015285599356), 'Agent1': np.float64(0.7135961383748994), 'B0': np.float64(0.7497988736926791), 'M1': np.float64(0.7747385358004827)}
+McNemar: pvalue      0.007290358091535637
+statistic   7.2
+/Users/danielhuang/tinyML/Fine-tuning/swarm-project/python_sims/metric/plotting.py:27: FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+  grp = df.groupby("cos_bin")[["acc_B0","acc_M1"]].mean()
+                       acc_B0    acc_M1
+cos_bin                                
+(0.000745, 0.06301]  0.440000  0.432000
+(0.06301, 0.1777]    0.427419  0.475806
+(0.1777, 0.3151]     0.451613  0.524194
+(0.3151, 0.567]      0.572581  0.685484
+(0.567, 0.7865]      0.776000  0.832000
+(0.7865, 0.9195]     0.927419  0.911290
+(0.9195, 0.9807]     0.943548  0.927419
+(0.9807, 0.997]      0.975806  0.975806
+(0.997, 0.9998]      0.983871  0.983871
+(0.9998, 1.0]        1.000000  1.000000
+Final cum NLL: {'_cum_b0': 952.1533755006669, '_cum_m1': 1153.8576644414125}
+ECE(M1): 0.21522811123515365
+(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % 
