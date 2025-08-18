@@ -54,7 +54,9 @@ def load_data():
             dataset = dataset.shuffle(1000)
         return dataset.prefetch(tf.data.AUTOTUNE)
 
-    train_dataset = load_split("./data/AVE_Dataset/processed/train.tfrecord", is_train=True)
+    train_pre_dataset = load_split("./data/AVE_Dataset/processed/train_pre.tfrecord", is_train=True)
+    val_pre_dataset = load_split("./data/AVE_Dataset/processed/val_pre.tfrecord", is_train=False)
+    train_fuse_dataset = load_split("./data/AVE_Dataset/processed/train_fuse.tfrecord", is_train=True)
     val_dataset = load_split("./data/AVE_Dataset/processed/val.tfrecord", is_train=False)
     test_dataset = load_split("./data/AVE_Dataset/processed/test.tfrecord", is_train=False)
-    return train_dataset, val_dataset, test_dataset
+    return train_pre_dataset, val_pre_dataset, train_fuse_dataset, val_dataset, test_dataset

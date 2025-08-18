@@ -14,4 +14,4 @@ use_baseline: true     # true => ignore attention, use B0 only
 use_attention: true        # true => compare B0 vs M1, false => use B0 only
 log_attention: false         # set true if you also log attention weights later
 
-date: 2025-08-15
+date: 2025-08-18

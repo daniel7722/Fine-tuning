@@ -252,6 +252,6 @@ def process_split(split_name):
     print(f"Finished {split_name} → wrote {tfrecord_path}")
 
 if __name__ == "__main__":
-    for split in ["train", "val", "test"]:
+    for split in ["train_pre", "val_pre", "train_fuse", "val", "test"]:
         process_split(split)
     print("TFRecord export complete →", OUTPUT_DIR)

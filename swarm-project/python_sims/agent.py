@@ -58,7 +58,7 @@ class Agent(ABC):
 	def __init__(self, agent_id, class_count=2, ema_alpha=0.3):
 		self.agent_id = agent_id
 		self.class_count = class_count
-		self.hedge_weight = tf.Variable(float(1.0/class_count), trainable=False)
+		self.hedge_weight = tf.Variable(float(1.0/2), trainable=False)
 		self.optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3, clipnorm=1.0)  
 		self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
@@ -106,15 +106,16 @@ class VisionAgent(Agent):
 			"hedge_weight": self.hedge_weight.numpy(), 
 		}
 
-	def pretrain(self, train_data, epochs=10, batch_size=32):
+	def pretrain(self, train_data, val_data, epochs=10, batch_size=32):
 		"""
 		Pre-train the vision agent on the training data.
 		"""	
 		self.backbone.trainable = False
-		dataset = extract_vision_dataset(train_data).shuffle(10000).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+		train_ds = extract_vision_dataset(train_data).shuffle(10000).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
+		val_ds = extract_vision_dataset(val_data).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
 		self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy"])
 		callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=2, restore_best_weights=True)
-		self.model.fit(dataset, epochs=epochs, verbose=1, callbacks=[callback])
+		self.model.fit(train_ds, epochs=epochs, verbose=1, callbacks=[callback], validation_data=val_ds)
 
 	def validate_pretraining(self, val_data, batch_size=32):
 		"""
@@ -139,7 +140,7 @@ class VisionAgent(Agent):
 		return float(loss.numpy())
 
 
-class AudioAgent(Agent): 
+class AudioAgent(Agent):
 	def __init__(self, agent_id, class_count=28):
 		super().__init__(agent_id, class_count)
 		self.modality_id = 1
@@ -258,7 +259,7 @@ class AudioAgent(Agent):
 			"hedge_weight": self.hedge_weight.numpy(),
 		}
 
-	def pretrain(self, train_data, val_data=None, epochs=10, batch_size=32):
+	def pretrain(self, train_data, val_data, epochs=10, batch_size=32):
 		"""Pre-train from raw waveforms with validation monitoring and light augmentation."""
 		sr = 16000
 
@@ -272,15 +273,13 @@ class AudioAgent(Agent):
 		)
 
 		# --- validation dataset (no augmentation, no shuffle) ---
-		val_ds = None
-		if val_data is not None:
-			val_ds = (
-				extract_audio_dataset(val_data)
-				.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
-				.cache()
-				.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True)
-				.prefetch(tf.data.AUTOTUNE)
-			)
+		val_ds = (
+			extract_audio_dataset(val_data)
+			.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
+			.cache()
+			.padded_batch(batch_size, padded_shapes=([None, 128], []), drop_remainder=True)
+			.prefetch(tf.data.AUTOTUNE)
+		)
 
 		# --- class weights from label distribution for balancing ---
 		def compute_class_weights(ds):
