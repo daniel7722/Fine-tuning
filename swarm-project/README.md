@@ -372,6 +372,93 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
 	•	Optionally add temperature scaling to fusion logits for calibration.
 	•	Longer term: test with richer datasets & more balanced audio model so fusion can meaningfully outperform vision-only.
 
+## 08-18
+[]
+Pre-training agents...
+Pre-training agent 0...
+Epoch 1/10
+2025-08-17 14:31:44.868102: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:381] TFRecordDataset `buffer_size` is unspecified, default to 262144
+     23/Unknown 14s 292ms/step - accuracy: 0.1335 - loss: 3.1281^R 
+     31/Unknown 16s 295ms/step - accuracy: 0.1679 - loss: 3.05142025-08-17 14:31:54.821241: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+/Users/danielhuang/tinyML/fine-tuning-env/lib/python3.10/site-packages/keras/src/trainers/epoch_iterator.py:151: UserWarning: Your input ran out of data; interrupting training. Make sure that your dataset or generator can generate at least `steps_per_epoch * epochs` batches. You may need to use the `.repeat()` function when building your dataset.
+  self._interrupted_warning()
+31/31 ━━━━━━━━━━━━━━━━━━━━ 16s 299ms/step - accuracy: 0.1717 - loss: 3.0395
+Epoch 2/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 295ms/step - accuracy: 0.6335 - loss: 1.62332025-08-17 14:32:04.777879: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 296ms/step - accuracy: 0.6338 - loss: 1.6162
+Epoch 3/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 309ms/step - accuracy: 0.7858 - loss: 0.9175
+Epoch 4/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 297ms/step - accuracy: 0.8677 - loss: 0.60332025-08-17 14:32:24.790686: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 298ms/step - accuracy: 0.8670 - loss: 0.6020
+Epoch 5/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 302ms/step - accuracy: 0.9257 - loss: 0.4079
+Epoch 6/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 303ms/step - accuracy: 0.9557 - loss: 0.2890
+Epoch 7/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 307ms/step - accuracy: 0.9654 - loss: 0.2247
+Epoch 8/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 323ms/step - accuracy: 0.9731 - loss: 0.17642025-08-17 14:33:05.558582: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 11s 324ms/step - accuracy: 0.9723 - loss: 0.1759
+Epoch 9/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 11s 319ms/step - accuracy: 0.9805 - loss: 0.1276
+Epoch 10/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 304ms/step - accuracy: 0.9895 - loss: 0.1112
+Saved pre-trained model for agent 0 to models/pretrained_agent_0.keras
+Pre-training agent 1...
+Epoch 1/10
+2025-08-17 14:33:40.214091: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 183 of 10000
+2025-08-17 14:33:50.349069: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 392 of 10000
+2025-08-17 14:34:10.211760: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 808 of 10000
+2025-08-17 14:34:18.973139: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:482] Shuffle buffer filled.
+31/31 ━━━━━━━━━━━━━━━━━━━━ 52s 16ms/step - accuracy: 0.1589 - loss: 3.1078 - learning_rate: 0.0010
+Epoch 2/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 15ms/step - accuracy: 0.5080 - loss: 1.9315 - learning_rate: 0.0010
+Epoch 3/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 19ms/step - accuracy: 0.6583 - loss: 1.3483 - learning_rate: 0.0010
+Epoch 4/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 24ms/step - accuracy: 0.6787 - loss: 1.1944 - learning_rate: 0.0010
+Epoch 5/10
+30/31 ━━━━━━━━━━━━━━━━━━━━ 0s 22ms/step - accuracy: 0.7338 - loss: 0.97122025-08-17 14:34:22.003617: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
+         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 22ms/step - accuracy: 0.7328 - loss: 0.9742 - learning_rate: 0.0010
+Epoch 6/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 29ms/step - accuracy: 0.7356 - loss: 0.9472 - learning_rate: 0.0010
+Epoch 7/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 23ms/step - accuracy: 0.7692 - loss: 0.8480 - learning_rate: 0.0010
+Epoch 8/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 26ms/step - accuracy: 0.8072 - loss: 0.7388 - learning_rate: 0.0010
+Epoch 9/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 26ms/step - accuracy: 0.8186 - loss: 0.6782 - learning_rate: 0.0010
+Epoch 10/10
+31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 27ms/step - accuracy: 0.8186 - loss: 0.6430 - learning_rate: 0.0010
+Saved pre-trained model for agent 1 to models/pretrained_agent_1.keras
+Pre-training complete.
+Validating pre-trained agents...
+7/7 ━━━━━━━━━━━━━━━━━━━━ 4s 332ms/step - accuracy: 0.6918 - loss: 0.8799
+Agent 0 validation loss: 0.7878
+7/7 ━━━━━━━━━━━━━━━━━━━━ 13s 2s/step - accuracy: 0.7297 - loss: 0.8916
+Agent 1 validation loss: 0.9382
+Continue training? (y/n): y
+Starting training...
+[Round 0] GT label = 7
+  Agent 0 pred=7 correct=True hedge=0.0357
+  Agent 1 pred=7 correct=True hedge=0.0357
+[Round 1] GT label = 6
+  Agent 0 pred=6 correct=True hedge=0.4988
+  Agent 1 pred=6 correct=True hedge=0.5012
+[Round 2] GT label = 11
+  Agent 0 pred=11 correct=True hedge=0.5085
+  Agent 1 pred=15 correct=False hedge=0.4915
+[EVAL:val@500] n=200 | a0=0.705  a1=0.705  b0=0.725  m1=0.795
+[EVAL:val@1000] n=200 | a0=0.705  a1=0.705  b0=0.705  m1=0.815
+[EVAL:val_final] n=829 | a0=0.713  a1=0.697  b0=0.697  m1=0.840
+[EVAL:test_final] n=829 | a0=0.688  a1=0.690  b0=0.691  m1=0.819
+
 ### Plotting
 # Heatmap for the final round
 python -m python_sims.util.plotting \
