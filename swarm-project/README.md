@@ -378,22 +378,14 @@ By overcoming overfitting for vision agent, leaving audio agent random, and leve
 Pre-training agents...
 Pre-training agent 0...
 Epoch 1/10
-2025-08-17 14:31:44.868102: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:381] TFRecordDataset `buffer_size` is unspecified, default to 262144
-     23/Unknown 14s 292ms/step - accuracy: 0.1335 - loss: 3.1281^R 
-     31/Unknown 16s 295ms/step - accuracy: 0.1679 - loss: 3.05142025-08-17 14:31:54.821241: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
-/Users/danielhuang/tinyML/fine-tuning-env/lib/python3.10/site-packages/keras/src/trainers/epoch_iterator.py:151: UserWarning: Your input ran out of data; interrupting training. Make sure that your dataset or generator can generate at least `steps_per_epoch * epochs` batches. You may need to use the `.repeat()` function when building your dataset.
-  self._interrupted_warning()
 31/31 ━━━━━━━━━━━━━━━━━━━━ 16s 299ms/step - accuracy: 0.1717 - loss: 3.0395
 Epoch 2/10
-31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 295ms/step - accuracy: 0.6335 - loss: 1.62332025-08-17 14:32:04.777879: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 295ms/step - accuracy: 0.6335 - loss: 1.6233
 31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 296ms/step - accuracy: 0.6338 - loss: 1.6162
 Epoch 3/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 309ms/step - accuracy: 0.7858 - loss: 0.9175
 Epoch 4/10
-31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 297ms/step - accuracy: 0.8677 - loss: 0.60332025-08-17 14:32:24.790686: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 297ms/step - accuracy: 0.8677 - loss: 0.6033
 31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 298ms/step - accuracy: 0.8670 - loss: 0.6020
 Epoch 5/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 302ms/step - accuracy: 0.9257 - loss: 0.4079
@@ -402,8 +394,7 @@ Epoch 6/10
 Epoch 7/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 10s 307ms/step - accuracy: 0.9654 - loss: 0.2247
 Epoch 8/10
-31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 323ms/step - accuracy: 0.9731 - loss: 0.17642025-08-17 14:33:05.558582: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
+31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 323ms/step - accuracy: 0.9731 - loss: 0.1764
 31/31 ━━━━━━━━━━━━━━━━━━━━ 11s 324ms/step - accuracy: 0.9723 - loss: 0.1759
 Epoch 9/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 11s 319ms/step - accuracy: 0.9805 - loss: 0.1276
@@ -412,10 +403,6 @@ Epoch 10/10
 Saved pre-trained model for agent 0 to models/pretrained_agent_0.keras
 Pre-training agent 1...
 Epoch 1/10
-2025-08-17 14:33:40.214091: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 183 of 10000
-2025-08-17 14:33:50.349069: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 392 of 10000
-2025-08-17 14:34:10.211760: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:452] ShuffleDatasetV3:40: Filling up shuffle buffer (this may take a while): 808 of 10000
-2025-08-17 14:34:18.973139: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:482] Shuffle buffer filled.
 31/31 ━━━━━━━━━━━━━━━━━━━━ 52s 16ms/step - accuracy: 0.1589 - loss: 3.1078 - learning_rate: 0.0010
 Epoch 2/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 0s 15ms/step - accuracy: 0.5080 - loss: 1.9315 - learning_rate: 0.0010
@@ -424,8 +411,7 @@ Epoch 3/10
 Epoch 4/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 24ms/step - accuracy: 0.6787 - loss: 1.1944 - learning_rate: 0.0010
 Epoch 5/10
-30/31 ━━━━━━━━━━━━━━━━━━━━ 0s 22ms/step - accuracy: 0.7338 - loss: 0.97122025-08-17 14:34:22.003617: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
+30/31 ━━━━━━━━━━━━━━━━━━━━ 0s 22ms/step - accuracy: 0.7338 - loss: 0.9712
 31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 22ms/step - accuracy: 0.7328 - loss: 0.9742 - learning_rate: 0.0010
 Epoch 6/10
 31/31 ━━━━━━━━━━━━━━━━━━━━ 1s 29ms/step - accuracy: 0.7356 - loss: 0.9472 - learning_rate: 0.0010
@@ -459,6 +445,23 @@ Starting training...
 [EVAL:val@1000] n=200 | a0=0.705  a1=0.705  b0=0.705  m1=0.815
 [EVAL:val_final] n=829 | a0=0.713  a1=0.697  b0=0.697  m1=0.840
 [EVAL:test_final] n=829 | a0=0.688  a1=0.690  b0=0.691  m1=0.819
+(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python python_sims/metric/plotting.py
+{'Agent0': np.float64(0.6967015285599356), 'Agent1': np.float64(0.7135961383748994), 'B0': np.float64(0.7562349155269509), 'M1': np.float64(0.7851971037811746)}
+McNemar: pvalue      0.0030960205499590185
+statistic   8.75
+  grp = df.groupby("cos_bin")[["acc_B0","acc_M1"]].mean()
+                       acc_B0    acc_M1
+cos_bin                                
+(0.000745, 0.06301]  0.448000  0.440000
+(0.06301, 0.1777]    0.411290  0.540323
+(0.1777, 0.3151]     0.524194  0.556452
+(0.3151, 0.567]      0.588710  0.685484
+(0.567, 0.7865]      0.768000  0.800000
+(0.7865, 0.9195]     0.927419  0.927419
+(0.9195, 0.9807]     0.935484  0.943548
+(0.9807, 0.997]      0.975806  0.975806
+(0.997, 0.9998]      0.983871  0.983871
+(0.9998, 1.0]        1.000000  1.000000
 
 ### Additional metrics: 
 []
@@ -467,15 +470,8 @@ Loaded pre-trained model for agent 0 from disk.
 Loaded pre-trained model for agent 1 from disk.
 Pre-training complete.
 Validating pre-trained agents...
-2025-08-18 15:24:37.495198: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:381] TFRecordDataset `buffer_size` is unspecified, default to 262144
-      7/Unknown 5s 304ms/step - accuracy: 0.7014 - loss: 0.89302025-08-18 15:24:39.826580: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
-/Users/danielhuang/tinyML/fine-tuning-env/lib/python3.10/site-packages/keras/src/trainers/epoch_iterator.py:151: UserWarning: Your input ran out of data; interrupting training. Make sure that your dataset or generator can generate at least `steps_per_epoch * epochs` batches. You may need to use the `.repeat()` function when building your dataset.
-  self._interrupted_warning()
 7/7 ━━━━━━━━━━━━━━━━━━━━ 5s 307ms/step - accuracy: 0.6918 - loss: 0.8799
 Agent 0 validation loss: 0.7878
-      7/Unknown 12s 2s/step - accuracy: 0.7419 - loss: 0.88502025-08-18 15:24:53.486692: I tensorflow/core/framework/local_rendezvous.cc:407] Local rendezvous is aborting with status: OUT_OF_RANGE: End of sequence
-         [[{{node IteratorGetNext}}]]
 7/7 ━━━━━━━━━━━━━━━━━━━━ 13s 2s/step - accuracy: 0.7297 - loss: 0.8916
 Agent 1 validation loss: 0.9382
 Continue training? (y/n): y
@@ -530,26 +526,22 @@ Starting training...
 [EVAL:test_final::M1] top confusions: [(6, 3, 11), (20, 11, 7), (3, 6, 7), (17, 27, 6), (13, 4, 5)]
 [EVAL:test_final] Top-5 per-class gains (acc, f1): [(13, 0.3999999999999801, 0.2880523731587573), (3, 0.3243243243243155, 0.22996515679442425), (24, 0.27777777777777, 0.16347687400318567), (25, 0.2727272727272604, 0.3199999999999766), (19, 0.24999999999998446, 0.07407407407406996)]
 [EVAL:test_final] n=829 | a0=0.688  a1=0.690  b0=0.691  m1=0.791
-(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python3 python_sims.metric.plotting.py
-python3: can't open file '/Users/danielhuang/tinyML/Fine-tuning/swarm-project/python_sims.metric.plotting.py': [Errno 2] No such file or directory
-(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python3 python_sims/metric/plotting.py 
-{'Agent0': np.float64(0.6967015285599356), 'Agent1': np.float64(0.7135961383748994), 'B0': np.float64(0.7497988736926791), 'M1': np.float64(0.7747385358004827)}
-McNemar: pvalue      0.007290358091535637
-statistic   7.2
-/Users/danielhuang/tinyML/Fine-tuning/swarm-project/python_sims/metric/plotting.py:27: FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % python3 python_sims/metric/plotting.py
+{'Agent0': np.float64(0.6875753920386007), 'Agent1': np.float64(0.6899879372738239), 'B0': np.float64(0.6911942098914354), 'M1': np.float64(0.7913148371531966)}
+McNemar: pvalue      5.6078418266289875e-14
+statistic   56.50420168067227
   grp = df.groupby("cos_bin")[["acc_B0","acc_M1"]].mean()
-                       acc_B0    acc_M1
-cos_bin                                
-(0.000745, 0.06301]  0.440000  0.432000
-(0.06301, 0.1777]    0.427419  0.475806
-(0.1777, 0.3151]     0.451613  0.524194
-(0.3151, 0.567]      0.572581  0.685484
-(0.567, 0.7865]      0.776000  0.832000
-(0.7865, 0.9195]     0.927419  0.911290
-(0.9195, 0.9807]     0.943548  0.927419
-(0.9807, 0.997]      0.975806  0.975806
-(0.997, 0.9998]      0.983871  0.983871
-(0.9998, 1.0]        1.000000  1.000000
-Final cum NLL: {'_cum_b0': 952.1533755006669, '_cum_m1': 1153.8576644414125}
-ECE(M1): 0.21522811123515365
-(fine-tuning-env) (base) danielhuang@Daniels-MacBook-Pro-2 swarm-project % 
+                        acc_B0    acc_M1
+cos_bin                                 
+(0.0003844, 0.07219]  0.349398  0.445783
+(0.07219, 0.1724]     0.385542  0.554217
+(0.1724, 0.3206]      0.397590  0.650602
+(0.3206, 0.556]       0.457831  0.734940
+(0.556, 0.7286]       0.590361  0.843373
+(0.7286, 0.8891]      0.865854  0.817073
+(0.8891, 0.9758]      0.891566  0.891566
+(0.9758, 0.9965]      0.975904  0.975904
+(0.9965, 0.9999]      1.000000  1.000000
+(0.9999, 1.0]         1.000000  1.000000
+Final cum NLL: {'_cum_b0': 795.7053007633231, '_cum_m1': 660.966834425238}
+ECE(M1): 0.10198587539579959

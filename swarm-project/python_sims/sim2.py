@@ -12,8 +12,6 @@ from util.sim_update_hedge import *
 from util.sim_metrics import ConfusionTracker, per_class_metrics_from_cm, macro_micro_from_cm, top_confusions, write_per_class_csv
 
 
-
-
 def eval_fusion_split(
     name,
     dataset,
@@ -23,7 +21,7 @@ def eval_fusion_split(
     use_baseline=True,
     use_attention=True,
     max_batches=None,
-    log_filename=None,   # NEW: if set, will write a per-example CSV
+    log_filename=None,
 ):
     """
     Evaluates agents, B0 (hedge mixture), and M1 (PoE) on a dataset.
