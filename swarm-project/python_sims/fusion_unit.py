@@ -4,15 +4,16 @@ from tensorflow.keras.layers import LayerNormalization, MultiHeadAttention
 from util.sim_update_hedge import mix_beliefs_hedge
 
 class FusionUnit(tf.keras.Model):
-    def __init__(self, class_count=2, num_agents=4, num_modalities=4, hidden_dim=16, embedding_dim=8, lambda_poe=0.5, epsilon=1e-12):
+    def __init__(self, class_count=2, num_agents=4, num_modalities=4, hidden_dim=16, embedding_dim=8, lambda_poe=0.5, epsilon=1e-12, use_hedge_feat=True):
         super().__init__()
         # attention parameters
         self.class_count = class_count
         self.embedding_dim = embedding_dim # Dimension for agent and modality embeddings 
 
         # PoE parameters
-        self.lambda_poe = lambda_poe
+        self.lambda_poe = tf.Variable(lambda_poe, trainable=False, dtype=tf.float32, name="lambda_poe")
         self.epsilon = float(epsilon)
+        self.use_hedge_feat = use_hedge_feat
 
         # Hedge parameters
         self.last_pi = None          # shape [N]
@@ -45,6 +46,7 @@ class FusionUnit(tf.keras.Model):
         # Mixer layer to assign dynamic weights to each agent's logits
         self.mixer = layers.Dense(1)
 
+
     def call(self, agent_outputs, agents, p_hedge=None, training=False):
         """
         agent_outputs: list of dicts with keys: 
@@ -68,11 +70,17 @@ class FusionUnit(tf.keras.Model):
             modality_vec = self.modality_embeddings(tf.expand_dims(modality_id, axis=0))
             identity_vec = tf.concat([agent_vec, modality_vec], axis=-1) # shape [1, 2*embedding_dim]
             identity_vec = tf.reshape(identity_vec, [-1]) # shape [2*embedding_dim]
-            combined = tf.concat([
-                belief, 
-                identity_vec, 
-                hedge_weight
-            ], axis=0)
+            if self.use_hedge_feat:
+                combined = tf.concat([
+                    belief,
+                    identity_vec,
+                    hedge_weight
+                ], axis=0)
+            else:
+                combined = tf.concat([
+                    belief,
+                    identity_vec
+                ], axis=0)
             x.append(combined)
 
         x = tf.stack(x, axis=0) # shape [N, K + 2E + 1]

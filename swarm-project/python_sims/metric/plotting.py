@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import yaml
 import matplotlib.pyplot as plt
 from math import log
 import scipy.stats as stats
@@ -12,14 +13,19 @@ plt.style.use("science")
 sns.set_theme(context="paper", style=None, rc=plt.rcParams)
 
 # --- IO paths ---------------------------------------------------------------
-TRAIN_CSV = "./logs/2025-08-18/AVE_additional_metrics.csv"
-TEST_CSV  = "./logs/2025-08-18/AVE_TEST_final_eval.csv"
-AGENT0_PER_CLASS_CSV = "./logs/2025-08-18/TEST_final_eval_perclass_agent0.csv"
-AGENT1_PER_CLASS_CSV = "./logs/2025-08-18/TEST_final_eval_perclass_agent1.csv"
-B0_PER_CLASS_CSV = "./logs/2025-08-18/TEST_final_eval_perclass_B0.csv"
-M1_PER_CLASS_CSV = "./logs/2025-08-18/TEST_final_eval_perclass_M1.csv"
+with open("configs/sim_config.yaml", encoding="utf-8") as f:
+    sim_config = yaml.safe_load(f)
+DATE = sim_config.get("date")
+name = sim_config.get("name")
+
+TRAIN_CSV = f"./logs/{DATE}/AVE_{name}.csv"
+TEST_CSV  = f"./logs/{DATE}/AVE_TEST_final_eval.csv"
+AGENT0_PER_CLASS_CSV = f"./logs/{DATE}/TEST_final_eval_perclass_agent0.csv"
+AGENT1_PER_CLASS_CSV = f"./logs/{DATE}/TEST_final_eval_perclass_agent1.csv"
+B0_PER_CLASS_CSV = f"./logs/{DATE}/TEST_final_eval_perclass_B0.csv"
+M1_PER_CLASS_CSV = f"./logs/{DATE}/TEST_final_eval_perclass_M1.csv"
 # Directory for figures
-FIG_DIR   = "./figs"
+FIG_DIR   = f"./figs/{DATE}/"
 os.makedirs(FIG_DIR, exist_ok=True)
 df_tr = pd.read_csv(TRAIN_CSV)
 df = pd.read_csv(TEST_CSV)

@@ -9,7 +9,7 @@ def compute_agent_loss(emissions, gt):
         losses.append(-np.log(p[gt] + 1e-12))
     return losses
 
-def update_hedge(agents, losses, eta=0.05, min_weight=1e-3): 
+def update_hedge(agents, losses, eta=0.05, min_weight=1e-2): 
     """In-place Hedge update on each agent. Returns list[float] new normalised weights."""
     # multiply-update + floor
     for a, loss in zip(agents, losses): 
@@ -19,7 +19,7 @@ def update_hedge(agents, losses, eta=0.05, min_weight=1e-3):
     # renormalise
     s = sum(float(a.hedge_weight.numpy()) for a in agents)
     s = s if s > 0 else 1.0
-    for a in agents: 
+    for a in agents:
         a.hedge_weight.assign(float(a.hedge_weight.numpy()) / s)
     return [float(a.hedge_weight.numpy()) for a in agents]
 

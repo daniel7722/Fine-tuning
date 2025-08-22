@@ -5,13 +5,22 @@ num_classes: 28
 num_modalities: 2
 
 hedge:
-  eta: 0.05
   min_weight: 0.001
   temperature: 1.0
   loss: nll
 
 use_baseline: true     # true => ignore attention, use B0 only
 use_attention: true        # true => compare B0 vs M1, false => use B0 only
-log_attention: false         # set true if you also log attention weights later
+allow_hedge_update: true  # allow Hedge to update weights during simulation
+use_hedge_feat: false  # use Hedge weights as a feature in M1
+eta: 0.05
+lambda_poe: 1
 
-date: 2025-08-18
+corruption: 
+  corrupt: true
+  corrupt_agent: 1
+  corrupt_start: 100
+  corrupt_len: 100
+
+date: 2025-08-21-7
+name: test_corruption2_lambda1
