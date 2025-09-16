@@ -6,7 +6,6 @@ RANDOM_STATE = 42  # keep deterministic across runs
 def load():
     df = pd.read_csv("./data/AVE_Dataset/annotations.txt", sep="&", engine="python")
     df.columns = ["Category", "VideoID", "Quality", "StartTime", "EndTime"]
-    # optional: sanity
     print("Total samples:", len(df), "Num classes:", df["Category"].nunique())
     return df
 
@@ -59,7 +58,6 @@ def save_splits(train_pre, val_pre, train_fuse, val_df, test_df):
 if __name__ == "__main__":
     df = load()
     train_pre, val_pre, train_fuse, val_df, test_df = split_four_way_with_valpre(df)
-    # (optional) quick per-class sanity:
     for name, part in [("train_pre", train_pre), ("val_pre", val_pre), ("train_fuse", train_fuse), ("val", val_df), ("test", test_df)]:
         print(name, part["Category"].value_counts().sort_index().to_dict())
     save_splits(train_pre, val_pre, train_fuse, val_df, test_df)

@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def compute_agent_loss(emissions, gt): 
+def compute_agent_loss(emissions, gt):
     """Returns list[float] NLL losses aligned with emissions order."""
     losses = []
     for out in emissions: 
@@ -9,10 +9,10 @@ def compute_agent_loss(emissions, gt):
         losses.append(-np.log(p[gt] + 1e-12))
     return losses
 
-def update_hedge(agents, losses, eta=0.05, min_weight=1e-2): 
+def update_hedge(agents, losses, eta=0.05, min_weight=1e-2):
     """In-place Hedge update on each agent. Returns list[float] new normalised weights."""
     # multiply-update + floor
-    for a, loss in zip(agents, losses): 
+    for a, loss in zip(agents, losses):
         w = float(a.hedge_weight.numpy()) * np.exp(-eta * loss)
         a.hedge_weight.assign(max(w, min_weight))
 

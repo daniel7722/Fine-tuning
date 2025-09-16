@@ -136,7 +136,8 @@ def eval_fusion_split(
         p_m1_gt = ""
         loss_m1 = ""
         pi0 = ""; pi1 = ""
-        m1_conf_top1 = ""; m1_margin = ""
+        m1_conf_top1 = ""
+        m1_margin = ""
         if use_attention:
             probs = fusion_unit.call(emissions, agents, training=False).numpy()  # [K]
             fused_m1_pred = int(probs.argmax())

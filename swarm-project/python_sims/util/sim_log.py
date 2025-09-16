@@ -3,7 +3,6 @@ import numpy as np
 import yaml
 from pathlib import Path
 
-# NOTE: keep the same dated log dir used elsewhere to avoid breaking paths
 with open("configs/sim_config.yaml") as f:
     sim_config = yaml.safe_load(f)
 DATE = sim_config.get("date")

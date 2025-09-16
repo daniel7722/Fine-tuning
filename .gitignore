@@ -185,6 +185,5 @@ uniform_split/
 imagenette2.tar
 AVE_Dataset/
 figs/
-logs/
 
 # End of https://www.toptal.com/developers/gitignore/api/python

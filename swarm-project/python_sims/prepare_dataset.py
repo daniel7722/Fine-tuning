@@ -8,8 +8,6 @@ from moviepy import VideoFileClip
 from pathlib import Path
 import tensorflow as tf
 
-
-
 DATA_DIR = "./data/AVE_Dataset/AVE"
 SPLIT_DIR = "./data/AVE_Dataset/splits"
 OUTPUT_DIR = "./data/AVE_Dataset/processed"

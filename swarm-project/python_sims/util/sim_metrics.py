@@ -1,4 +1,3 @@
-# util/sim_metrics.py
 import numpy as np
 import csv
 

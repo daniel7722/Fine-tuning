@@ -46,6 +46,49 @@ def ece(probs: np.ndarray, correct: np.ndarray, n_bins: int = 10) -> float:
     return float(e)
 
 
+# --- Reliability diagram (calibration curve) helpers -----------------------
+from typing import Tuple
+
+def _bin_acc_conf(conf: np.ndarray, correct: np.ndarray, n_bins: int = 10) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return per-bin (bin_centers, bin_acc, bin_conf) for reliability plots."""
+    conf = np.asarray(conf, dtype=float)
+    correct = np.asarray(correct, dtype=bool)
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    which = np.digitize(conf, bins) - 1
+    centers = 0.5 * (bins[:-1] + bins[1:])
+    accs = np.zeros(n_bins, dtype=float)
+    confs = np.zeros(n_bins, dtype=float)
+    for b in range(n_bins):
+        m = which == b
+        if m.any():
+            accs[b] = correct[m].mean()
+            confs[b] = conf[m].mean()
+        else:
+            accs[b] = np.nan
+            confs[b] = np.nan
+    return centers, accs, confs
+
+
+def _plot_reliability(conf: np.ndarray, correct: np.ndarray, title: str, outpath: str, n_bins: int = 10):
+    centers, accs, confs = _bin_acc_conf(conf, correct, n_bins=n_bins)
+    fig = plt.figure(figsize=(4.0, 4.0))
+    ax = fig.add_subplot(111)
+    ax.plot([0, 1], [0, 1], linestyle='--', linewidth=1, color='k', alpha=0.6, label='Perfect calibration')
+    ax.plot(confs, accs, marker='o', linewidth=1.5, label='Empirical')
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel('Confidence')
+    ax.set_ylabel('Accuracy')
+    ax.set_title(title)
+    ax.legend(frameon=False)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=1200, bbox_inches='tight')
+    base, _ = os.path.splitext(outpath)
+    fig.savefig(base + '.pdf', dpi=1200, bbox_inches='tight', format='pdf')
+    plt.close(fig)
+
+
 # --- Confusion-matrix helpers ----------------------------------------------
 def _compute_cm(df_src: pd.DataFrame, pred_col: str, gt_col: str = "ground_truth"):
     """Return (raw_cm, row-normalized_cm, labels) as DataFrames.
@@ -102,7 +145,7 @@ if os.path.exists(TRAIN_CSV):
     ax1.grid(True, alpha=0.3)
     fig1.tight_layout()
     outpath1 = os.path.join(FIG_DIR, "train_accuracy.png")
-    fig1.savefig(outpath1, dpi=1200, bbox_inches="tight")
+    # fig1.savefig(outpath1, dpi=1200, bbox_inches="tight")
     base1, _ = os.path.splitext(outpath1)
     fig1.savefig(base1 + ".pdf", dpi=1200, bbox_inches="tight", format="pdf")
     plt.close(fig1)
@@ -128,6 +171,15 @@ m1c = df["acc_M1"] == 1
 b0c = df["acc_B0"] == 1
 b = int(( m1c & ~b0c ).sum())  # M1 correct, B0 wrong
 c = int((~m1c &  b0c ).sum())  # M1 wrong,  B0 correct
+
+# Off-diagonal and diagonal counts
+n11 = int(( m1c &  b0c ).sum())   # both correct
+n00 = int((~m1c & ~b0c ).sum())   # both wrong
+
+print(f"McNemar counts: b (M1 correct, B0 wrong) = {b}")
+print(f"McNemar counts: c (M1 wrong,  B0 correct) = {c}")
+print(f"Agreement cells: n11 (both correct) = {n11}, n00 (both wrong) = {n00}")
+
 from statsmodels.stats.contingency_tables import mcnemar
 exact = True if b + c < 25 else False
 print("McNemar:", mcnemar([[0, c], [b, 0]], exact=exact))
@@ -159,7 +211,7 @@ if "cos_sim_beliefs" in df:
     ax2.grid(True, alpha=0.3)
     fig2.tight_layout()
     outpath2 = os.path.join(FIG_DIR, "cosine_gain.png")
-    fig2.savefig(outpath2, dpi=1200, bbox_inches='tight')
+    # fig2.savefig(outpath2, dpi=1200, bbox_inches='tight')
     base2, _ = os.path.splitext(outpath2)
     fig2.savefig(base2 + ".pdf", dpi=1200, bbox_inches='tight', format="pdf")
     plt.close(fig2)
@@ -178,6 +230,31 @@ if "m1_conf_top1" in df:
     e = ece(df["m1_conf_top1"].values, df["acc_M1"].astype(bool).values, n_bins=10)
     print("ECE(M1):", e)
 
+# Reliability diagrams (prefer explicit top-1 confidence columns if available)
+# For M1
+if 'm1_conf_top1' in df and 'acc_M1' in df:
+    _plot_reliability(
+        df['m1_conf_top1'].astype(float).values,
+        df['acc_M1'].astype(bool).values,
+        title='Reliability Diagram — M1',
+        outpath=os.path.join(FIG_DIR, 'reliability_m1.png'),
+        n_bins=10,
+    )
+else:
+    print("[warn] Missing 'm1_conf_top1' or 'acc_M1' for M1 reliability plot; skipping.")
+
+# For B0: try 'b0_conf_top1' first; otherwise skip (cannot infer from p_b0_gt alone)
+if 'b0_conf_top1' in df and 'acc_B0' in df:
+    _plot_reliability(
+        df['b0_conf_top1'].astype(float).values,
+        df['acc_B0'].astype(bool).values,
+        title='Reliability Diagram — B0',
+        outpath=os.path.join(FIG_DIR, 'reliability_b0.png'),
+        n_bins=10,
+    )
+else:
+    print("[warn] Missing 'b0_conf_top1' or 'acc_B0' for B0 reliability plot; skipping.")
+
 # --- 2c) Cumulative Regret vs B0 (uses p_b0_gt, p_m1_gt) -------------------
 if {"p_b0_gt", "p_m1_gt"}.issubset(df.columns):
     df["_nll_b0"] = -np.log(df["p_b0_gt"].clip(EPS))
@@ -187,16 +264,16 @@ if {"p_b0_gt", "p_m1_gt"}.issubset(df.columns):
     fig3 = plt.figure(figsize=(6.0, 3.3))
     ax3 = fig3.add_subplot(111)
     x = np.arange(len(df))
-    ax3.plot(x, df["_regret_vs_b0"], label="Regret (M1 - B0)")
+    ax3.plot(x, df["_regret_vs_b0"], label="Loss (M1 - B0)")
     ax3.axhline(0, linestyle="--", linewidth=1, color="k", alpha=0.5)
     ax3.set_xlabel("Example index (test order)")
-    ax3.set_ylabel("Cumulative regret")
-    ax3.set_title("Cumulative Regret vs Baseline")
+    ax3.set_ylabel("Cumulative loss")
+    ax3.set_title("Cumulative NLL difference (M1 - B0)")
     ax3.legend()
     ax3.grid(True, alpha=0.3)
     fig3.tight_layout()
     outpath3 = os.path.join(FIG_DIR, "regret_vs_b0.png")
-    fig3.savefig(outpath3, dpi=1200, bbox_inches='tight')
+    # fig3.savefig(outpath3, dpi=1200, bbox_inches='tight')
     base3, _ = os.path.splitext(outpath3)
     fig3.savefig(base3 + ".pdf", dpi=1200, bbox_inches='tight', format="pdf")
     plt.close(fig3)
@@ -218,7 +295,7 @@ if {"p_b0_gt", "p_m1_gt"}.issubset(df.columns):
         ax3b.grid(True, alpha=0.3)
         fig3b.tight_layout()
         outpath3b = os.path.join(FIG_DIR, "regret_vs_oracle.png")
-        fig3b.savefig(outpath3b, dpi=1200, bbox_inches='tight')
+        # fig3b.savefig(outpath3b, dpi=1200, bbox_inches='tight')
         base3b, _ = os.path.splitext(outpath3b)
         fig3b.savefig(base3b + ".pdf", dpi=1200, bbox_inches='tight', format="pdf")
         plt.close(fig3b)
@@ -243,13 +320,13 @@ if {"hedge0", "hedge1", "pi0", "pi1"}.issubset(df_tr.columns):
         ax4.plot(xs, m*xs + b, linewidth=1)
     ax4.axhline(0, linestyle="--", linewidth=1, color="k", alpha=0.5)
     ax4.axvline(0, linestyle="--", linewidth=1, color="k", alpha=0.5)
-    ax4.set_xlabel(r"$\Delta$ hedge (hedge1 - hedge0)")
-    ax4.set_ylabel(r"$\Delta$ attention (pi1 - pi0)")
+    ax4.set_xlabel(r"$\Delta$ hedge (Audio hedge - Vision hedge)")
+    ax4.set_ylabel(r"$\Delta$ attention (Audio $\pi$ - Vision $\pi$)")
     ax4.set_title("Alignment of Hedge and Attention")
     ax4.grid(True, alpha=0.3)
     fig4.tight_layout()
     outpath4 = os.path.join(FIG_DIR, "hedge_attention_alignment.png")
-    fig4.savefig(outpath4, dpi=1200, bbox_inches='tight')
+    # fig4.savefig(outpath4, dpi=1200, bbox_inches='tight')
     base4, _ = os.path.splitext(outpath4)
     fig4.savefig(base4 + ".pdf", dpi=1200, bbox_inches='tight', format="pdf")
     plt.close(fig4)
@@ -270,7 +347,7 @@ if {"hedge0", "hedge1", "pi0", "pi1"}.issubset(df_tr.columns):
     ax5.grid(True, alpha=0.3)
     fig5.tight_layout()
     outpath5 = os.path.join(FIG_DIR, "hedge_attention_strength.png")
-    fig5.savefig(outpath5, dpi=1200, bbox_inches='tight')
+    # fig5.savefig(outpath5, dpi=1200, bbox_inches='tight')
     base5, _ = os.path.splitext(outpath5)
     fig5.savefig(base5 + ".pdf", dpi=1200, bbox_inches='tight', format="pdf")
     plt.close(fig5)
@@ -289,7 +366,7 @@ if {"ground_truth", "agent0_pred", "agent1_pred", "fused_B0_pred", "fused_M1_pre
     for col, name in cm_specs:
         cm_raw, cm_norm, _ = _compute_cm(df, pred_col=col, gt_col="ground_truth")
         outpath_norm = os.path.join(FIG_DIR, f"confmat_{col}_norm.png")
-        _plot_cm(cm_norm, f"Confusion Matrix (normalized) — {name}", outpath_norm, vmax=1.0)
+        _plot_cm(cm_norm, f"Confusion Matrix (normalised) — {name}", outpath_norm, vmax=1.0)
         outpath_raw = os.path.join(FIG_DIR, f"confmat_{col}_raw.png")
         vmax_val = cm_raw.values.max() if cm_raw.values.max() > 0 else 1.0
         _plot_cm(cm_raw,  f"Confusion Matrix (counts) — {name}", outpath_raw,  vmax=vmax_val)
@@ -320,8 +397,8 @@ try:
             return df_out
 
         df_list = [
-            _prep(a0, "Agent0"),
-            _prep(a1, "Agent1"),
+            _prep(a0, "Vision"),
+            _prep(a1, "Audio"),
             _prep(b0, "B0"),
             _prep(m1, "M1"),
         ]
@@ -332,29 +409,27 @@ try:
         f1_wide_filled = f1_wide.fillna(0.0)
 
         # Threshold for poor performance
-        THR = 0.5
-        poor_a0 = f1_wide_filled.get("Agent0", pd.Series(0, index=f1_wide_filled.index)) < THR
-        poor_a1 = f1_wide_filled.get("Agent1", pd.Series(0, index=f1_wide_filled.index)) < THR
-
-        both_poor_idx   = f1_wide_filled.index[ poor_a0 &  poor_a1 ]
-        vision_poor_idx = f1_wide_filled.index[ poor_a0 & ~poor_a1 ]
-        audio_poor_idx  = f1_wide_filled.index[~poor_a0 &  poor_a1 ]
+        THR = 0.45
+        # Classes where at least one unimodal model (Vision or Audio) is below threshold
+        any_poor_mask = (f1_wide_filled.get("Vision", pd.Series(0, index=f1_wide_filled.index)) < THR) \
+                        | (f1_wide_filled.get("Audio", pd.Series(0, index=f1_wide_filled.index)) < THR)
+        any_poor_idx = f1_wide_filled.index[any_poor_mask]
 
         def _plot_bucket(indices, title, fname):
             if len(indices) == 0:
                 print(f"[info] No classes for bucket: {title}; skipping plot.")
                 return
-            cols_present = [c for c in ["Agent0","Agent1","B0","M1"] if c in f1_wide.columns]
+            cols_present = [c for c in ["Vision","Audio","B0","M1"] if c in f1_wide.columns]
             f1_long = (
                 f1_wide.loc[indices, cols_present]
                 .reset_index()
                 .melt(id_vars="class_id", var_name="Modality", value_name="F1")
             )
             # Order by min unimodal F1 to surface the hardest classes first
-            if all(c in f1_wide_filled.columns for c in ["Agent0","Agent1"]):
+            if all(c in f1_wide_filled.columns for c in ["Vision","Audio"]):
                 order_score = np.minimum(
-                    f1_wide_filled.loc[indices, "Agent0"].values,
-                    f1_wide_filled.loc[indices, "Agent1"].values
+                    f1_wide_filled.loc[indices, "Vision"].values,
+                    f1_wide_filled.loc[indices, "Audio"].values
                 )
                 order = list(np.array(indices)[np.argsort(order_score)])
                 f1_long["class_id"] = pd.Categorical(f1_long["class_id"], categories=order, ordered=True)
@@ -372,13 +447,69 @@ try:
             ax.grid(True, axis="y", alpha=0.3)
             fig.tight_layout()
             outpng = os.path.join(FIG_DIR, f"{fname}.png")
-            fig.savefig(outpng, dpi=1200, bbox_inches="tight")
+            # fig.savefig(outpng, dpi=1200, bbox_inches="tight")
             base, _ = os.path.splitext(outpng)
             fig.savefig(base + ".pdf", dpi=1200, bbox_inches="tight", format="pdf")
             plt.close(fig)
 
-        _plot_bucket(both_poor_idx,   "Per-class F1 (both unimodal poor)",   "perclass_f1_both_poor")
-        _plot_bucket(vision_poor_idx, "Per-class F1 (vision poor, audio ok)", "perclass_f1_vision_poor")
-        _plot_bucket(audio_poor_idx,  "Per-class F1 (audio poor, vision ok)",  "perclass_f1_audio_poor")
+        _plot_bucket(any_poor_idx, "Per-class F1 (at least one modality is poor)", "perclass_f1_any_poor")
+
+        # --- Radar (spider) plot: each spoke is a class; lines are modalities ---
+        def _plot_radar(indices, title, fname, max_classes=12):
+            # Limit to avoid clutter
+            if len(indices) == 0:
+                print(f"[info] No classes for radar: {title}; skipping plot.")
+                return
+            # Order by hardness (min of unimodals), then take top-K hardest
+            if all(c in f1_wide_filled.columns for c in ["Vision", "Audio"]):
+                order_score = np.minimum(
+                    f1_wide_filled.loc[indices, "Vision"].values,
+                    f1_wide_filled.loc[indices, "Audio"].values,
+                )
+                ordered = list(np.array(indices)[np.argsort(order_score)])
+            else:
+                ordered = list(indices)
+            classes = ordered[:max_classes]
+            cols_present = [c for c in ["Vision","Audio","B0","M1"] if c in f1_wide_filled.columns]
+            if len(cols_present) == 0:
+                print("[warn] No modalities present for radar; skipping.")
+                return
+
+            # Angles for spokes
+            n = len(classes)
+            angles = np.linspace(0, 2*np.pi, n, endpoint=False)
+
+            fig = plt.figure(figsize=(6.0, 6.0))
+            ax = fig.add_subplot(111, projection='polar')
+            ax.set_theta_offset(np.pi / 2)
+            ax.set_theta_direction(-1)
+            ax.set_ylim(0.0, 1.0)
+            ax.set_yticks([0.25, 0.5, 0.75, 1.0])
+            ax.set_yticklabels(["0.25","0.50","0.75","1.0"])
+            ax.grid(True, alpha=0.3)
+
+            # Class labels around the circle
+            ax.set_xticks(angles)
+            ax.set_xticklabels([str(c) for c in classes])
+
+            # Plot one line per modality
+            for mod in cols_present:
+                vals = f1_wide_filled.loc[classes, mod].fillna(0.0).values.astype(float)
+                # close the polygon
+                vals_closed = np.concatenate([vals, vals[:1]])
+                ang_closed = np.concatenate([angles, angles[:1]])
+                ax.plot(ang_closed, vals_closed, linewidth=1.6, label=mod)
+                ax.fill(ang_closed, vals_closed, alpha=0.08, label="_nolegend_")
+
+            ax.set_title(title)
+            ax.legend(loc='upper right', bbox_to_anchor=(1.25, 1.10), frameon=False, ncol=1)
+            fig.tight_layout()
+            outpng = os.path.join(FIG_DIR, f"{fname}.png")
+            # fig.savefig(outpng, dpi=1200, bbox_inches='tight')
+            base, _ = os.path.splitext(outpng)
+            fig.savefig(base + ".pdf", dpi=1200, bbox_inches='tight', format='pdf')
+            plt.close(fig)
+
+        _plot_radar(any_poor_idx, "Radar — F1 by class", "radar_f1_any_poor", max_classes=12)
 except Exception as e:
     print(f"[error] per-class F1 three-way plotting failed: {e}")

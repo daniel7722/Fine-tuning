@@ -55,7 +55,7 @@ FEATURE_DIM = 64
 
 class Agent(ABC): 
 
-	def __init__(self, agent_id, class_count=2, ema_alpha=0.3):
+	def __init__(self, agent_id, class_count=2):
 		self.agent_id = agent_id
 		self.class_count = class_count
 		self.hedge_weight = tf.Variable(float(1.0/2), trainable=False)
@@ -64,21 +64,21 @@ class Agent(ABC):
 
 
 	@abstractmethod
-	def emit(self, episode):
+	def emit(self, data):
 		"""
 		Single round: emit softmax + current trust.
 		"""
 
 	@abstractmethod
-	def train_step(self, event, label): 
+	def train_step(self, event, label):
 		"""
 		Train step for the agent.
 		x: input data
 		y: ground truth label
 		"""
 
-class VisionAgent(Agent): 
-	def __init__(self, agent_id, class_count=28): 
+class VisionAgent(Agent):
+	def __init__(self, agent_id, class_count=28):
 		super().__init__(agent_id, class_count)
 		self.modality_id = 0
 		self.backbone = tf.keras.applications.EfficientNetB0(
@@ -92,7 +92,7 @@ class VisionAgent(Agent):
 		])
 		self.model = tf.keras.Sequential([self.backbone, self.classifier])
 
-	def emit(self, data): 
+	def emit(self, data):
 		image = data["vision_data"] # Expected to be preprocessed image tensor,
 		logits = self.model(tf.expand_dims(image, axis=0), training=False) # Add batch dimension
 		belief = tf.nn.softmax(logits).numpy()[0]
@@ -109,7 +109,7 @@ class VisionAgent(Agent):
 	def pretrain(self, train_data, val_data, epochs=10, batch_size=32):
 		"""
 		Pre-train the vision agent on the training data.
-		"""	
+		"""
 		self.backbone.trainable = False
 		train_ds = extract_vision_dataset(train_data).shuffle(10000).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
 		val_ds = extract_vision_dataset(val_data).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
@@ -261,7 +261,6 @@ class AudioAgent(Agent):
 
 	def pretrain(self, train_data, val_data, epochs=10, batch_size=32):
 		"""Pre-train from raw waveforms with validation monitoring and light augmentation."""
-		sr = 16000
 
 		train_ds = (
 			extract_audio_dataset(train_data)
@@ -272,7 +271,7 @@ class AudioAgent(Agent):
 			.prefetch(tf.data.AUTOTUNE)
 		)
 
-		# --- validation dataset (no augmentation, no shuffle) ---
+		# validation dataset (no augmentation, no shuffle)
 		val_ds = (
 			extract_audio_dataset(val_data)
 			.map(lambda x, y: (self.preprocess_and_embed(x, augment=False), y), num_parallel_calls=tf.data.AUTOTUNE)
@@ -281,7 +280,7 @@ class AudioAgent(Agent):
 			.prefetch(tf.data.AUTOTUNE)
 		)
 
-		# --- class weights from label distribution for balancing ---
+		# class weights from label distribution for balancing
 		def compute_class_weights(ds):
 			counts = np.zeros(self.class_count, dtype=np.int64)
 			it = (

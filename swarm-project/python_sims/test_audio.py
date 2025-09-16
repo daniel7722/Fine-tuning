@@ -1,4 +1,3 @@
-# python_sims/test_audio.py
 import os
 import numpy as np
 import tensorflow as tf
@@ -9,12 +8,10 @@ import librosa as lr
 
 from util.sim_load_data import load_data, filter_valid_audio
 
-# OPTIONAL: use moviepy to read mp4 audio reliably
-#   pip install moviepy
 from moviepy import VideoFileClip
 
-DATA_ROOT = "./data/AVE_Dataset"   # change if your layout differs
-VIDEOS_DIR = os.path.join(DATA_ROOT, "AVE")  # expecting <video_id>.mp4 here
+DATA_ROOT = "./data/AVE_Dataset"   
+VIDEOS_DIR = os.path.join(DATA_ROOT, "AVE") 
 SR = 16000
 
 def load_mp4_audio_librosa(video_path, target_sr=SR):

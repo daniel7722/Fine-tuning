@@ -14,7 +14,7 @@ use_attention: true        # true => compare B0 vs M1, false => use B0 only
 allow_hedge_update: true  # allow Hedge to update weights during simulation
 use_hedge_feat: false  # use Hedge weights as a feature in M1
 eta: 0.05
-lambda_poe: 1
+lambda_poe: 0.5
 
 corruption: 
   corrupt: true
@@ -22,5 +22,5 @@ corruption:
   corrupt_start: 100
   corrupt_len: 100
 
-date: 2025-08-21-7
-name: test_corruption2_lambda1
+date: 2025-08-18
+name: additional_metrics

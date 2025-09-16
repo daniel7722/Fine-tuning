@@ -3,7 +3,6 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import yaml
-import csv
 
 from agent import VisionAgent, AudioAgent
 from fusion_unit import FusionUnit
@@ -72,22 +71,18 @@ def main(pretrain: bool):
     # --- Logging
     log_file, csv_writer = setup_log_file(filename)
 
-    # Confusion tracker
+    # --- Confusion tracker
     tracker = ConfusionTracker(
         num_classes=NUM_CLASSES,
         agent_ids=[agent.agent_id for agent in agents]
     )
 
-    # --- Iterative (single-threaded) rounds
-    # IMPORTANT: iterate train_data exactly once, 1 sample per round.
-    # All agents see the same 'data' dict each round.
     emissions = []
 
     for round_idx, data in enumerate(train_fuse_dataset.take(MAX_ROUNDS)):
         # Pull ground-truth as python int
         gt = int(data["label"].numpy()) if hasattr(data["label"], "numpy") else int(data["label"])
 
-        # Optional sanity print for the first few rounds only
         if round_idx < 3:
             print(f"[Round {round_idx}] GT label = {gt}")
 
@@ -99,7 +94,7 @@ def main(pretrain: bool):
                       f"correct={out['correct']} hedge={out['hedge_weight']:.4f}")
             emissions.append(out)
 
-        # --- Gather beliefs, preds, hedges for baseline ---
+        # Gather beliefs, preds, hedges for baseline 
         beliefs = [np.array(e["belief"], dtype=np.float32) for e in emissions]   # [B_v, B_a]
         preds   = [int(np.argmax(b)) for b in beliefs]
         hedges  = [float(a.hedge_weight.numpy()) for a in agents]                # [h_v, h_a]
@@ -113,12 +108,11 @@ def main(pretrain: bool):
         acc_b0 = ""
         fused_b0_pred = ""
         if USE_BASELINE:
-            # --- Baseline B0: hedge mixture (weighted average) ---
+            #  Baseline B0: hedge mixture (weighted average) 
             p_hedge = mix_beliefs_hedge(emissions, agents)
             fused_b0_pred   = int(np.argmax(p_hedge))
             acc_b0          = int(fused_b0_pred == gt)
 
-        # --- Optionally compute M1 fused prediction ---
         fused_m1_pred = ""
         acc_m1 = ""
         if USE_ATTENTION:
@@ -204,7 +198,7 @@ def main(pretrain: bool):
         log_filename="VAL_final_eval",
     )
 
-    # Final test (this is the one you’ll analyze for the paper):
+    # Final test:
     eval_fusion_split(
         name="test_final",
         dataset=test_dataset,
